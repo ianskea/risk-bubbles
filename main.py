@@ -41,7 +41,7 @@ TICKERS = {
     # ASX - ETFs
     "Global X Semi": "SEMI.AX",
     "Global X FANG+": "FANG.AX",
-    "BetaShares Res": "QRE.AX",
+    "BetaShares Mining Resources": "QRE.AX",
     "Global X Robots": "RBTZ.AX",
     "BetaShares Asia": "ASIA.AX",
     "Vanguard Prop": "VAP.AX",
