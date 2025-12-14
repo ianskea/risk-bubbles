@@ -14,10 +14,12 @@ def validate_model(df: pd.DataFrame, risk_col: str = 'risk_total', forward_windo
     3. Calibration: If Risk=0.8, is price in 80th percentile of history?
     """
     # Create Analysis Setup
-    val_df = df.copy()
+    if risk_col not in df.columns:
+        return {"error": f"Missing risk column '{risk_col}'"}
+
+    val_df = df[['Close', risk_col]].dropna().copy()
     
     # Calculate Forward Returns (e.g., 30 days)
-    # We want to know: If Risk is HIGH at t, is Return(t+30) LOW?
     val_df['fwd_return'] = val_df['Close'].shift(-forward_window) / val_df['Close'] - 1
     val_df.dropna(inplace=True)
     
@@ -73,6 +75,13 @@ def validate_model(df: pd.DataFrame, risk_col: str = 'risk_total', forward_windo
     return report
 
 def generate_validation_report_text(ticker: str, metrics: dict) -> str:
+    if metrics.get("error"):
+        return f"""
+VALIDATION REPORT: {ticker}
+------------------------------------------------
+Error: {metrics.get('error')}
+------------------------------------------------
+"""
     return f"""
 VALIDATION REPORT: {ticker}
 ------------------------------------------------

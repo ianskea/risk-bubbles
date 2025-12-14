@@ -3,23 +3,16 @@
 bash# First time setup
 pip install -r requirements.txt
 
-# Test enhanced system (2 min)
-python run_validated_analysis.py  # option 3
+# Quick single-asset check (2 min)
+python run_validated_analysis.py  # choose option 3
 
-# Validate model accuracy (15 min)
-python run_validated_analysis.py  # option 1
+# Full validation suite (15 min)
+python run_validated_analysis.py  # choose option 1
 
-# Compare both systems (10 min)
-python compare_systems.py
-
-# Monitor portfolio (2-10 min)
-python portfolio_monitor.py quick  # Fast
-python portfolio_monitor.py        # Full
-
-# Full analysis (20 min)
+# Full analysis/reporting (20 min)
 python enhanced_main.py
 
-# Keep using original
+# Legacy baseline
 python main.py
 
 

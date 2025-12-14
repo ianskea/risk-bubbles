@@ -5,35 +5,44 @@ from scipy.stats import linregress, norm
 
 def fetch_data(ticker: str, period: str = "max") -> pd.DataFrame:
     """
-    Fetches historical market data for a given ticker.
+    Fetch adjusted OHLCV for a ticker. Prefers adjusted close to avoid split/div noise.
     """
     print(f"Fetching data for {ticker}...")
     try:
-        data = yf.download(ticker, period=period, progress=False, auto_adjust=False)
-        
-        # Handle MultiIndex columns (common in newer yfinance versions)
-        if isinstance(data.columns, pd.MultiIndex):
-            if 'Close' in data.columns.get_level_values(0):
-                data = data.xs('Close', axis=1, level=0, drop_level=True)
-        
-        # Ensure we have a Close column
-        if len(data.columns) == 1:
-            data = data.rename(columns={data.columns[0]: 'Close'})
-            
-        if 'Close' not in data.columns:
-             # Try to find a column with 'Close' in it
-             close_cols = [c for c in data.columns if 'Close' in str(c)]
-             if close_cols:
-                 data = data.rename(columns={close_cols[0]: 'Close'})
-                 data = data[['Close']]
-
-        if 'Close' not in data.columns:
-            raise ValueError(f"Could not locate 'Close' column in data. Columns found: {data.columns}")
-
-        data = data[['Close']].dropna()
+        data = yf.download(ticker, period=period, progress=False, auto_adjust=True)
         if data.empty:
             raise ValueError(f"No data returned for {ticker}")
-            
+
+        # Flatten MultiIndex from yfinance (Price|Ticker)
+        if isinstance(data.columns, pd.MultiIndex):
+            # If only one ticker, drop the ticker level
+            if len(set(data.columns.get_level_values(-1))) == 1:
+                data.columns = data.columns.get_level_values(0)
+            else:
+                data = data.droplevel(0, axis=1)
+
+        # Normalize column names
+        cols = {str(c).lower(): c for c in data.columns}
+        rename = {}
+        close_key = 'close' if 'close' in cols else 'adj close' if 'adj close' in cols else None
+        if close_key:
+            rename[cols[close_key]] = 'Close'
+        for key in ['high', 'low', 'volume']:
+            if key in cols:
+                rename[cols[key]] = key.capitalize()
+        data = data.rename(columns=rename)
+
+        if 'Close' not in data.columns:
+            raise ValueError(f"Could not locate Close column in data. Columns found: {data.columns}")
+
+        # Ensure required fields exist; allow Volume to be missing (fallback handled later)
+        for required in ['High', 'Low']:
+            if required not in data.columns:
+                data[required] = data['Close']
+        if 'Volume' not in data.columns:
+            data['Volume'] = np.nan
+
+        data = data[['Close', 'High', 'Low', 'Volume']].dropna(subset=['Close'])
         return data
     except Exception as e:
         raise ValueError(f"Error fetching data for {ticker}: {e}")
@@ -41,11 +50,15 @@ def fetch_data(ticker: str, period: str = "max") -> pd.DataFrame:
 # --- Technical Indicators ---
 
 def calculate_rsi(series: pd.Series, period: int = 14) -> pd.Series:
+    # Wilder smoothing to reduce whipsaw
     delta = series.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-    rs = gain / loss
-    return 100 - (100 / (1 + rs))
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    roll_up = gain.ewm(alpha=1/period, adjust=False).mean()
+    roll_down = loss.ewm(alpha=1/period, adjust=False).mean()
+    rs = roll_up / roll_down.replace(0, np.nan)
+    rsi = 100 - (100 / (1 + rs))
+    return rsi.clip(lower=0, upper=100)
 
 def calculate_macd(series: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> pd.Series:
     exp1 = series.ewm(span=fast, adjust=False).mean()
@@ -75,8 +88,8 @@ def calculate_stochastic(high, low, close, period=14, smooth_k=3):
     return k.rolling(window=smooth_k).mean()
 
 def calculate_bollinger_width(series: pd.Series, period: int = 20, std_dev: float = 2.0) -> pd.Series:
-    ma = series.rolling(window=period).mean()
-    std = series.rolling(window=period).std()
+    ma = series.rolling(window=period, min_periods=period//2).mean()
+    std = series.rolling(window=period, min_periods=period//2).std()
     upper = ma + (std * std_dev)
     lower = ma - (std * std_dev)
     # Bandwidth normalized by price
@@ -84,9 +97,10 @@ def calculate_bollinger_width(series: pd.Series, period: int = 20, std_dev: floa
 
 # --- Risk Components ---
 
-def normalize_series(s: pd.Series, lookback: int = 500) -> pd.Series:
+def normalize_series(s: pd.Series, lookback: int = 252, min_frac: float = 0.5) -> pd.Series:
     """Normalize a series to 0-1 percentile rank based on rolling history."""
-    return s.rolling(lookback).rank(pct=True)
+    min_periods = max(5, int(lookback * min_frac))
+    return s.rolling(lookback, min_periods=min_periods).rank(pct=True)
 
 def calculate_valuation_risk(df: pd.DataFrame, min_periods: int = 200) -> tuple[pd.Series, pd.DataFrame]:
     """
@@ -176,33 +190,7 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     """
     # 1. Fetch
     try:
-        # Note: We need Volume for full "Institutional" score.
-        # Modifying fetch to try getting Volume if possible, else ignore.
-        df = yf.download(ticker, period="max", progress=False, auto_adjust=False)
-        
-        # Cleanup YFinance 
-        if isinstance(df.columns, pd.MultiIndex):
-            # Try to flatten if possible
-            if 'Close' in df.columns.get_level_values(0):
-                 df = df.xs('Close', axis=1, level=0, drop_level=True) # This might lose Volume info if Volume is at level 0
-                 # Actually yfinance return: Price | Ticker
-                 #                      Close | BTC-USD ...
-                 # Let's do a better job handling structure:
-            elif 'Close' in df.columns.get_level_values(1): # New yfinance sometimes Ticker | Price
-                 df = df.swaplevel(0, 1, axis=1)
-                 if 'Close' in df.columns:
-                     df = df['Close'] # Only closes? We want volume.
-        
-        # Re-fetch just to be safe/simple with just Close for now, 
-        # or accept that we might not have Volume.
-        # Let's stick to the robust 'fetch_data' helper for Close, 
-        # and try to grab volume separately or just infer.
-        # For simplicity in this iteration: Stick to Close-only indicators if Volume is tricky,
-        # OR assume fetch_data can be upgraded.
-        # Let's use the fetch_data we defined above which returns just [Close]. 
-        # And simulate volume risk with volatility for now to guarantee run.
-        df = fetch_data(ticker) 
-        
+        df = fetch_data(ticker)
     except Exception as e:
         print(f"Error: {e}")
         return pd.DataFrame(), {}, {}
@@ -212,46 +200,43 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     df['risk_valuation'] = val_risk
     
     # 3. Momentum Risk (25%)
-    # Logic: High RSI = High Risk. Low RSI = Low Risk.
-    # We normalize RSI (0-100) to 0-1 directly? Or percentile?
-    # Percentile is safer for "Institutional" (regime adjusting).
     rsi = calculate_rsi(df['Close'])
     df['rsi'] = rsi
-    df['risk_momentum'] = normalize_series(rsi)
+    df['risk_momentum'] = normalize_series(rsi, lookback=252)
     
     # 4. Volatility Risk (20%)
-    # Logic: Assessing if current volatility is high (Panic/Top) or Low (Complacency).
-    # Paradox: High vol often bottom (panic) AND top (blowoff).
-    # We want to flag "Abnormal" conditions.
-    # Let's map Wide Bands = High Risk of Reversion? 
-    # Actually, Low vol = Accumulation (Low Risk). High Vol = Distribution/Panic (High Risk/High Reward).
-    # Simple model: High Volatility = Higher Uncertainty = Higher Risk score.
     bb_width = calculate_bollinger_width(df['Close'])
-    df['risk_volatility'] = normalize_series(bb_width)
+    df['risk_volatility'] = normalize_series(bb_width, lookback=252)
     
-    # 5. Volume Risk (15%) - Placeholder (using Price Momentum Proxy or Random)
-    # Since we only fetched Close, we use "Price Roc" as proxy for activity?
-    # Or just spread the weight.
-    # Let's re-weight: Val 50, Mom 30, Vol 20.
-    df['risk_volume'] = 0.5 # Neutral if no data
-    
-    # Composite Score
-    # Weights: Val 0.5, Mom 0.3, Vol 0.2
-    df['risk_total'] = (
-        (df['risk_valuation'].fillna(0.5) * 0.5) +
-        (df['risk_momentum'].fillna(0.5) * 0.3) +
-        (df['risk_volatility'].fillna(0.5) * 0.2)
-    )
-    
-    # Clean Initial NaNs
-    df.dropna(inplace=True)
+    # 5. Volume Risk (15%)
+    if 'Volume' in df.columns and df['Volume'].notna().any():
+        volume_risk = normalize_series(df['Volume'], lookback=252)
+        df['risk_volume'] = volume_risk
+    else:
+        df['risk_volume'] = np.nan
+
+    weights = {
+        'risk_valuation': 0.40,
+        'risk_momentum': 0.25,
+        'risk_volatility': 0.20,
+        'risk_volume': 0.15
+    }
+
+    def _safe_factor(name: str) -> pd.Series:
+        return df.get(name, pd.Series(np.nan, index=df.index)).fillna(0.5)
+
+    df['risk_total'] = sum(_safe_factor(name) * weight for name, weight in weights.items())
+
+    # Clean early NaNs in inputs without discarding full history
+    df = df.dropna(subset=['risk_total'])
     
     # Metadata
+    last_risk = df['risk_total'].iloc[-1]
     metadata = {
         "ticker": ticker,
         "last_price": df['Close'].iloc[-1],
-        "last_risk": df['risk_total'].iloc[-1],
-        "rating": "HOLD" # placeholder
+        "last_risk": last_risk,
+        "rating": "BUY" if last_risk < 0.3 else "SELL" if last_risk > 0.75 else "HOLD"
     }
     
     return df, {}, metadata

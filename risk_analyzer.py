@@ -8,7 +8,7 @@ def fetch_data(ticker: str, period: str = "max") -> pd.DataFrame:
     Fetches historical market data for a given ticker.
     """
     print(f"Fetching data for {ticker}...")
-    data = yf.download(ticker, period=period, progress=False, auto_adjust=False)
+    data = yf.download(ticker, period=period, progress=False, auto_adjust=True)
     print(f"Columns: {data.columns}")
     if data.empty:
         raise ValueError(f"No data found for ticker {ticker}")
