@@ -103,11 +103,11 @@ def plot_risk_analysis(ticker_name: str, ticker_symbol: str, df):
 
 def generate_traffic_light(risk):
     if risk < 0.4:
-        return "🟢" # Green - Buy/Opportunity
+        return "ðŸŸ¢" # Green - Buy/Opportunity
     elif risk < 0.6:
-        return "🟡" # Yellow - Neutral/Hold
+        return "ðŸŸ¡" # Yellow - Neutral/Hold
     else:
-        return "🔴" # Red - Sell/Risk
+        return "ðŸ”´" # Red - Sell/Risk
 
 def generate_recommendation(ticker_name, price, risk):
     """
@@ -132,7 +132,7 @@ def generate_recommendation(ticker_name, price, risk):
             - Risk 0.5 = Fair Value Trend.
             - Risk > 0.8 = Statistical "Bubble" / Overvalued (Sell Zone).
             - Risk < 0.2 = Statistical Undervalued / Trend Bottom (Buy Zone).
-            - Indicator: 🟢=Good/Buy, 🟡=Neutral, 🔴=Risk/Sell
+            - Indicator: ðŸŸ¢=Good/Buy, ðŸŸ¡=Neutral, ðŸ”´=Risk/Sell
             
             Task:
             Write a short, punchy 3-sentence analysis for a user looking to Dollar Cost Average (DCA).
