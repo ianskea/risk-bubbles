@@ -3,6 +3,9 @@
 bash# First time setup
 pip install -r requirements.txt
 
+# venv setup
+source venv/bin/activate
+
 # Quick single-asset check (2 min)
 python run_validated_analysis.py  # choose option 3
 

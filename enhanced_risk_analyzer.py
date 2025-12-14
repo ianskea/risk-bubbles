@@ -87,6 +87,31 @@ def calculate_stochastic(high, low, close, period=14, smooth_k=3):
     k = 100 * ((close - lowest_low) / (highest_high - lowest_low))
     return k.rolling(window=smooth_k).mean()
 
+def calculate_mfi(high, low, close, volume, period=14):
+    """
+    Money Flow Index (MFI)
+    Uses Typical Price * Volume to gauge buying vs selling pressure.
+    Returns 0-100.
+    """
+    typical_price = (high + low + close) / 3
+    money_flow = typical_price * volume
+    
+    # Get direction
+    delta = typical_price.diff()
+    
+    # Positive/Negative Flow
+    pos_flow = money_flow.where(delta > 0, 0)
+    neg_flow = money_flow.where(delta < 0, 0)
+    
+    # Sum over period
+    pos_sum = pos_flow.rolling(window=period).sum()
+    neg_sum = neg_flow.rolling(window=period).sum()
+    
+    # Ratio
+    mfi_ratio = pos_sum / neg_sum.replace(0, np.nan)
+    mfi = 100 - (100 / (1 + mfi_ratio))
+    return mfi
+
 def calculate_bollinger_width(series: pd.Series, period: int = 20, std_dev: float = 2.0) -> pd.Series:
     ma = series.rolling(window=period, min_periods=period//2).mean()
     std = series.rolling(window=period, min_periods=period//2).std()
@@ -208,10 +233,13 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     bb_width = calculate_bollinger_width(df['Close'])
     df['risk_volatility'] = normalize_series(bb_width, lookback=252)
     
-    # 5. Volume Risk (15%)
-    if 'Volume' in df.columns and df['Volume'].notna().any():
-        volume_risk = normalize_series(df['Volume'], lookback=252)
-        df['risk_volume'] = volume_risk
+    # 5. Volume Risk (15%) - Enhanced with MFI
+    # If Volume exists, use MFI (Money Flow Index) to detect smart money flow
+    if 'Volume' in df.columns and df['Volume'].notna().any() and 'High' in df.columns:
+        mfi = calculate_mfi(df['High'], df['Low'], df['Close'], df['Volume'])
+        df['mfi'] = mfi
+        # Normalize MFI: High MFI (>80) = Overbought/Risk. Low MFI (<20) = Oversold/Opp.
+        df['risk_volume'] = normalize_series(mfi, lookback=252)
     else:
         df['risk_volume'] = np.nan
 
