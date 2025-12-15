@@ -244,10 +244,10 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
         df['risk_volume'] = np.nan
 
     weights = {
-        'risk_valuation': 0.40,
-        'risk_momentum': 0.25,
-        'risk_volatility': 0.20,
-        'risk_volume': 0.15
+        'risk_valuation': 0.30,
+        'risk_momentum': 0.20,
+        'risk_volatility': 0.25,
+        'risk_volume': 0.25
     }
 
     def _safe_factor(name: str) -> pd.Series:
@@ -258,6 +258,23 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     # Clean early NaNs in inputs without discarding full history
     df = df.dropna(subset=['risk_total'])
     
+    # --- CRYPTO ADJUSTMENT ---
+    # User feedback: "Sold too early". Crypto bull runs persist in "Overbought" zones.
+    # Logic: If Long-Term Trend is UP (Price > 200 SMA), dampen the risk score to encourage holding.
+    # This aligns with "The Trend is your Friend".
+    if ticker.endswith("-USD"):
+        sma_200 = df['Close'].rolling(200).mean()
+        # If Price > SMA200, we satisfy "Bull Market Regime".
+        # We multiply Risk by 0.85 to lower it (move from Sell -> Hold).
+        # We ensure we align indices.
+        bull_trend = df['Close'] > sma_200
+        
+        # Apply dampener where trend is bullish
+        # Using .loc to avoid SettingWithCopy warning if any
+        # We only dampen if risk is NOT extreme (>0.9). If it's >0.9, it's a bubble regardless of trend.
+        mask = (bull_trend) & (df['risk_total'] < 0.9)
+        df.loc[mask, 'risk_total'] = df.loc[mask, 'risk_total'] * 0.85
+
     # Metadata
     last_risk = df['risk_total'].iloc[-1]
     metadata = {
