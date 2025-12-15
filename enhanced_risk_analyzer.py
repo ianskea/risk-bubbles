@@ -320,6 +320,44 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     
     return df, {}, metadata
 
+def calculate_mlr(gold_df, gdx_df, period=60):
+    """
+    Calculates Miner Leverage Ratio (MLR).
+    Formula: Rolling Ratio of (GDX Returns / Gold Returns).
+    Target: < 0.5 (Undervalued), > 3 (Bubble).
+    """
+    if gold_df.empty or gdx_df.empty: return 0.0
+    
+    # Align dates
+    common_idx = gold_df.index.intersection(gdx_df.index)
+    g = gold_df.loc[common_idx, 'Close'].pct_change()
+    m = gdx_df.loc[common_idx, 'Close'].pct_change()
+    
+    # User Spec: "(GDX % change) / (Gold % change)"
+    # We use rolling sum of returns to smooth daily noise
+    roll_g = g.rolling(period).sum()
+    roll_m = m.rolling(period).sum()
+    
+    # Handle division by zero
+    mlr = roll_m / roll_g
+    mlr = mlr.replace([np.inf, -np.inf], np.nan).fillna(0)
+    
+    return mlr.iloc[-1]
+
+def calculate_yield_corr(gold_df, tnx_df, period=60):
+    """
+    Calculates Yield-Gold Correlation (60-day).
+    Target: -0.7 to -0.9 (Normal). > +0.3 (Crisis).
+    """
+    if gold_df.empty or tnx_df.empty: return 0.0
+    
+    common_idx = gold_df.index.intersection(tnx_df.index)
+    g = gold_df.loc[common_idx, 'Close']
+    y = tnx_df.loc[common_idx, 'Close']
+    
+    corr = g.rolling(period).corr(y)
+    return corr.iloc[-1]
+
 if __name__ == "__main__":
     # Test
     try:

@@ -152,61 +152,112 @@ def generate_ai_analysis(ticker, price, risk, metrics):
 
 def analyze_market_cycle():
     """
-    Analyzes Macro Capital Rotation:
-    1. Gold/Silver Ratio (GSR) -> Precious Metals Cycle
-    2. ETH/BTC Ratio -> Crypto Risk Appetite
+    Analyzes Capital Cascade Model (Crypto, Metals, Macro, China, Social).
+    Generates Composite Risk Score and Dashboard.
     """
-    print("Analyzing Global Market Cycle...")
-    cycle_report = "GLOBAL MARKET CYCLE ANALYSIS\n" + "-"*30 + "\n"
+    print("Analyzing Capital Cascade Model...")
+    from enhanced_risk_analyzer import fetch_data, analyze_asset, calculate_mlr, calculate_yield_corr
+    
+    cycle_report = "RISK-BUBBLE ANALYSIS: CAPITAL CASCADE DASHBOARD\n" + "="*50 + "\n"
     
     try:
-        # Fetch Benchmarks (using verify=False if needed or just standard)
-        # We need raw prices. Reuse analyze_asset but just take last price?
-        # Or simple fetch. specific fetch is lighter.
-        # Imporing fetch_data from risk_analyzer avoids circular dependency if careful
-        from enhanced_risk_analyzer import fetch_data
+        # -- 1. FETCH DATA & ANALYZE CORE ASSETS --
+        # Crypto
+        btc_df, _, btc_meta = analyze_asset("BTC-USD")
+        eth_df, _, eth_meta = analyze_asset("ETH-USD")
         
-        # 1. Precious Metals
-        gold_df = fetch_data("GC=F")
-        silver_df = fetch_data("SI=F")
+        # Metals
+        gold_df, _, gold_meta = analyze_asset("GC=F")
+        silver_df, _, silver_meta = analyze_asset("SI=F")
+        gdx_df, _, gdx_meta = analyze_asset("GDX")
         
-        if not gold_df.empty and not silver_df.empty:
-            gold_p = gold_df['Close'].iloc[-1]
-            silver_p = silver_df['Close'].iloc[-1]
-            gsr = gold_p / silver_p
-            
-            status = "NEUTRAL"
-            if gsr > 80: status = "ACCUMULATION (Safe Haven Flows -> Gold)"
-            elif gsr < 50: status = "DISTRIBUTION (Speculative Mania -> Silver)"
-            
-            cycle_report += f"GOLD/SILVER RATIO: {gsr:.2f}\n"
-            cycle_report += f"Phase: {status}\n\n"
-            
-        # 2. Crypto Rotation
-        btc_df = fetch_data("BTC-USD")
-        eth_df = fetch_data("ETH-USD")
+        # Macro
+        tnx_df = fetch_data("^TNX") # 10 Year Yield
         
-        if not btc_df.empty and not eth_df.empty:
-            btc_p = btc_df['Close'].iloc[-1]
-            eth_p = eth_df['Close'].iloc[-1]
-            eth_btc = eth_p / btc_p
-            
-            status = "NEUTRAL"
-            if eth_btc < 0.05: status = "ACCUMULATION (Bitcoin Season -> Low Risk)"
-            elif eth_btc > 0.08: status = "DISTRIBUTION (Alt Season -> High Risk)"
-            
-            cycle_report += f"ETH/BTC RATIO:     {eth_btc:.4f}\n"
-            cycle_report += f"Phase: {status}\n"
-            
+        # -- 2. CALCULATE METRICS --
+        # Ratios
+        gsr = gold_meta['last_price'] / silver_meta['last_price'] if silver_meta['last_price'] else 0
+        eth_btc = eth_meta['last_price'] / btc_meta['last_price'] if btc_meta['last_price'] else 0
+        mlr = calculate_mlr(gold_df, gdx_df)
+        yield_corr = calculate_yield_corr(gold_df, tnx_df)
+        
+        # BTC Dominance Proxy (ETH/BTC)
+        # Low ETH/BTC = High BTC.D (Bear/Early Bull). High ETH/BTC = Low BTC.D (Alt Season).
+        
+        # -- 3. COMPONENT RISK SCORES (0-1) --
+        # Crypto Risk: Avg of BTC & ETH Risk (proxy for market)
+        crypto_risk = (btc_meta['last_risk'] + eth_meta['last_risk']) / 2
+        
+        # Metals Risk: Avg of Gold & Silver Risk
+        metals_risk = (gold_meta['last_risk'] + silver_meta['last_risk']) / 2
+        
+        # Macro Risk: Based on Yield Corr & MLR Divergence
+        # If Corr > 0.3 (Broken) -> High Risk. If MLR < 0.5 (Cheap) -> Low Risk?
+        # User formula implies Macro is input. Let's map Yield Corr to 0-1.
+        # Corr -1 (Good) -> 0. Corr +1 (Bad) -> 1.
+        # Adjusted: (Corr + 1) / 2?
+        macro_risk = (yield_corr + 1) / 2 
+        # But user says "Macro Risk: 0.70 (HIGH)" when Corr is ~0 (Broken).
+        # So Normalized: 0.5 + (Corr * 0.5)? If Corr=0, Risk=0.5. If Corr=0.4, Risk=0.7.
+        macro_risk = 0.5 + (yield_corr * 0.5)
+        
+        # China (Static 0.3) & Social (Static 0.55) as per User Request
+        china_risk = 0.30
+        social_risk = 0.55
+        
+        # -- 4. COMPOSITE SCORE --
+        # Formula: (Crypto * 0.25) + (Metals * 0.25) + (Macro * 0.25) + (China * 0.15) + (Social * 0.10)
+        composite_score = (crypto_risk * 0.25) + \
+                          (metals_risk * 0.25) + \
+                          (macro_risk * 0.25) + \
+                          (china_risk * 0.15) + \
+                          (social_risk * 0.10)
+                          
+        # Status Label
+        status_label = "MODERATE"
+        if composite_score < 0.2: status_label = "EXTREME LOW (BUY ALL)"
+        elif composite_score < 0.4: status_label = "LOW (ACCUMULATE)"
+        elif composite_score < 0.6: status_label = "MODERATE"
+        elif composite_score < 0.75: status_label = "HIGH (SCALE OUT)"
+        elif composite_score < 0.85: status_label = "VERY HIGH (WARNING)"
+        else: status_label = "EXTREME (SELL)"
+
+        # -- 5. GENERATE REPORT --
+        cycle_report += f"\nCOMPOSITE RISK: {composite_score:.2f} ({status_label})\n"
+        cycle_report += "-"*50 + "\n"
+        
+        cycle_report += "ASSET STATUS:\n"
+        cycle_report += f"- BTC:    ${btc_meta['last_price']:.0f} | Risk: {btc_meta['last_risk']:.2f}\n"
+        cycle_report += f"- ETH:    ${eth_meta['last_price']:.0f} | Risk: {eth_meta['last_risk']:.2f}\n"
+        cycle_report += f"- GOLD:   ${gold_meta['last_price']:.1f} | Risk: {gold_meta['last_risk']:.2f}\n"
+        cycle_report += f"- SILVER: ${silver_meta['last_price']:.1f} | Risk: {silver_meta['last_risk']:.2f}\n"
+        cycle_report += f"- GDX:    ${gdx_meta['last_price']:.2f}\n\n"
+        
+        cycle_report += "KEY METRICS:\n"
+        cycle_report += f"- Gold/Silver Ratio: {gsr:.2f} ({'Accumulation' if gsr > 80 else 'Distribution'})\n"
+        cycle_report += f"- ETH/BTC Ratio:     {eth_btc:.4f}\n"
+        cycle_report += f"- Miner Lev (MLR):   {mlr:.2f}x ({'Undervalued' if mlr < 0.5 else 'Normal'})\n"
+        cycle_report += f"- Yield-Gold Corr:   {yield_corr:.2f} ({'Broken' if yield_corr > -0.3 else 'Normal'})\n\n"
+        
+        cycle_report += "RISK BREAKDOWN:\n"
+        cycle_report += f"- Crypto: {crypto_risk:.2f}\n"
+        cycle_report += f"- Metals: {metals_risk:.2f}\n"
+        cycle_report += f"- Macro:  {macro_risk:.2f}\n"
+        cycle_report += f"- China:  {china_risk:.2f} (Est)\n"
+        cycle_report += f"- Social: {social_risk:.2f} (Est)\n"
+
     except Exception as e:
         cycle_report += f"Error calculating cycle metrics: {e}\n"
+        import traceback
+        traceback.print_exc()
     
-    cycle_report += "="*60 + "\n\n"
+    cycle_report += "="*50 + "\n\n"
     
-    # Return both report text and raw data for context
     context = {
         "gsr": locals().get('gsr', 0),
-        "eth_btc": locals().get('eth_btc', 0)
+        "eth_btc": locals().get('eth_btc', 0),
+        "mlr": locals().get('mlr', 0),
+        "composite_score": locals().get('composite_score', 0)
     }
     return cycle_report, context
 
