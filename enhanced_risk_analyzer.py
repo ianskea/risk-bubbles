@@ -258,20 +258,52 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     # Clean early NaNs in inputs without discarding full history
     df = df.dropna(subset=['risk_total'])
     
-    # --- CRYPTO ADJUSTMENT ---
-    # User feedback: "Sold too early". Crypto bull runs persist in "Overbought" zones.
-    # Logic: If Long-Term Trend is UP (Price > 200 SMA), dampen the risk score to encourage holding.
-    # This aligns with "The Trend is your Friend".
+    # --- CRYPTO ADJUSTMENT (COWEN FRAMEWORK) ---
+    # User feedback: "Ben Cowen Risk-Bubble Analysis Program"
+    # 1. Bull Market Support Band (BMSB): 20W SMA and 21W EMA
+    # 2. Bear Confirmation: 50W SMA
+    # 3. Generational Bottom: 200W SMA
+    
+    cowen_meta = {}
+    
     if ticker.endswith("-USD"):
-        sma_200 = df['Close'].rolling(200).mean()
-        # If Price > SMA200, we satisfy "Bull Market Regime".
-        # We multiply Risk by 0.85 to lower it (move from Sell -> Hold).
-        # We ensure we align indices.
-        bull_trend = df['Close'] > sma_200
+        # Calculate Daily approximations for Weekly bands
+        # 20 Weeks = 140 Days
+        sma_20w = df['Close'].rolling(window=140).mean()
+        ema_21w = df['Close'].ewm(span=147, adjust=False).mean() # 21 weeks * 7 = 147
+        sma_50w = df['Close'].rolling(window=350).mean() # 50 * 7
+        sma_200w = df['Close'].rolling(window=1400).mean() # 200 * 7 - likely NaN for new coins
         
-        # Apply dampener where trend is bullish
-        # Using .loc to avoid SettingWithCopy warning if any
-        # We only dampen if risk is NOT extreme (>0.9). If it's >0.9, it's a bubble regardless of trend.
+        # Store in DF for plotting
+        df['sma_20w'] = sma_20w
+        df['ema_21w'] = ema_21w
+        df['sma_50w'] = sma_50w
+        df['sma_200w'] = sma_200w
+        
+        # Trend Logic using Cowen's Levels
+        current_price = df['Close'].iloc[-1]
+        
+        # Determine Phase
+        is_above_bmsb = (current_price > sma_20w.iloc[-1]) and (current_price > ema_21w.iloc[-1])
+        is_below_50w = current_price < sma_50w.iloc[-1]
+        
+        cowen_meta = {
+            "bmsb_20w_sma": sma_20w.iloc[-1],
+            "bmsb_21w_ema": ema_21w.iloc[-1],
+            "sma_50w": sma_50w.iloc[-1],
+            "sma_200w": sma_200w.iloc[-1] if not np.isnan(sma_200w.iloc[-1]) else 0,
+            "status_bmsb": "ABOVE" if is_above_bmsb else "BELOW",
+            "status_50w": "BELOW (Bear Warning)" if is_below_50w else "ABOVE"
+        }
+
+        # Original Trend Confidence Mode (still useful for risk dampening)
+        # If Price > 200D (approx 28W), we dampen risk. 
+        # Let's align it with Cowen: If above BMSB, we are Bullish -> Dampen Risk.
+        # If below 50W, we are Bearish -> Do NOT dampen risk (let Sell signals fire? or actually Risk is low in bear?)
+        # Ben: "Risk 0-0.4 Aggressive Buy".
+        # If we are crashing (Below 50W), Risk Score should naturally drop if Price drops fast?
+        # Let's keep the dampener simple: If Above 20W SMA (Bull), dampen high risk scores to let them run.
+        bull_trend = df['Close'] > sma_20w 
         mask = (bull_trend) & (df['risk_total'] < 0.9)
         df.loc[mask, 'risk_total'] = df.loc[mask, 'risk_total'] * 0.85
 
@@ -281,7 +313,8 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
         "ticker": ticker,
         "last_price": df['Close'].iloc[-1],
         "last_risk": last_risk,
-        "rating": "BUY" if last_risk < 0.3 else "SELL" if last_risk > 0.75 else "HOLD"
+        "rating": "BUY" if last_risk < 0.3 else "SELL" if last_risk > 0.75 else "HOLD",
+        **cowen_meta
     }
     
     return df, {}, metadata

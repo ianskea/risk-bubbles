@@ -173,12 +173,27 @@ def main():
             # AI Insight
             ai_text = generate_ai_analysis(name, meta['last_price'], meta['last_risk'], val_metrics)
             
+            # Cowen Framework Data
+            cowen_section = ""
+            if "bmsb_20w_sma" in meta:
+                cowen_section = f"""
+BEN COWEN FRAMEWORK ANALYSIS:
+20W SMA (BMSB): ${meta['bmsb_20w_sma']:.2f}
+21W EMA (BMSB): ${meta['bmsb_21w_ema']:.2f}
+Status vs BMSB: {meta['status_bmsb']}
+
+50W SMA (Bear Line): ${meta['sma_50w']:.2f}
+Status vs 50W:  {meta['status_50w']}
+
+200W SMA (Bottom): ${meta['sma_200w']:.2f}
+"""
+
             # Report Section
             section = f"""
 ASSET: {name} ({ticker})
 Price: ${meta['last_price']:.2f}
 RISK SCORE: {meta['last_risk']:.2f}  [{'BUY' if meta['last_risk']<0.3 else 'SELL' if meta['last_risk']>0.75 else 'HOLD'}]
-
+{cowen_section}
 Validation Reliability: {val_metrics.get('score', 0)}/100
 (Correlation: {val_metrics.get('correlation', 0):.2f})
 
