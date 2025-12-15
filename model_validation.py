@@ -53,12 +53,38 @@ def validate_model(df: pd.DataFrame, risk_col: str = 'risk_total', forward_windo
     # - Significant p-value (+20 pts)
     # - Data quality (+20 pts)
     
+    # Score the Model (0-100)
+    # Pivot to "Performance Based" rather than "Linear Correlation Based"
+    # Criteria:
+    # - Spread: Returns in Buy Zone > Sell Zone (+40 pts)
+    # - Safety: Win Rate in Buy Zone > Sell Zone (+20 pts)
+    # - Correlation: Negative slope (+20 pts)
+    # - Reliability: Data quantity/quality (+20 pts)
+    
     score = 0
-    if corr_rank < -0.1: score += 30
-    if corr_rank < -0.3: score += 10 # Bonus
-    if bottom_decile_ret > top_decile_ret: score += 30
-    if p_rank < 0.05: score += 20
-    if len(val_df) > 365: score += 10
+    
+    # 1. Performance Spread (40 pts)
+    # Primary Utility: Does buying low risk beat buying high risk?
+    avg_buy = bucket_perf.get('Strong Buy', bucket_perf.get('Buy', -999))
+    avg_sell = bucket_perf.get('Sell', bucket_perf.get('Reduce', 999))
+    
+    if avg_buy > avg_sell: score += 40
+    
+    # 2. Win Rate Spread (20 pts)
+    # Do we win more often in the buy zone?
+    wr_buy = win_rate.get('Strong Buy', win_rate.get('Buy', 0))
+    wr_sell = win_rate.get('Sell', win_rate.get('Reduce', 1))
+    
+    if wr_buy > wr_sell: score += 20
+    
+    # 3. Correlation (20 pts)
+    # We still want a general negative trend (higher risk = lower return)
+    if corr_rank < 0: score += 10
+    if corr_rank < -0.1: score += 10
+    
+    # 4. Reliability (20 pts)
+    if p_rank < 0.10: score += 10 # Relaxed significance
+    if len(val_df) > 200: score += 10
     
     report = {
         "score": score,

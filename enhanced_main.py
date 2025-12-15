@@ -226,12 +226,17 @@ def analyze_market_cycle():
         cycle_report += f"\nCOMPOSITE RISK: {composite_score:.2f} ({status_label})\n"
         cycle_report += "-"*50 + "\n"
         
+        def get_signal(r):
+            if r < 0.3: return "🟢 [BUY]"
+            if r > 0.75: return "🔴 [SELL]"
+            return "🟡 [HOLD]"
+        
         cycle_report += "ASSET STATUS:\n"
-        cycle_report += f"- BTC:    ${btc_meta['last_price']:.0f} | Risk: {btc_meta['last_risk']:.2f}\n"
-        cycle_report += f"- ETH:    ${eth_meta['last_price']:.0f} | Risk: {eth_meta['last_risk']:.2f}\n"
-        cycle_report += f"- GOLD:   ${gold_meta['last_price']:.1f} | Risk: {gold_meta['last_risk']:.2f}\n"
-        cycle_report += f"- SILVER: ${silver_meta['last_price']:.1f} | Risk: {silver_meta['last_risk']:.2f}\n"
-        cycle_report += f"- GDX:    ${gdx_meta['last_price']:.2f}\n\n"
+        cycle_report += f"- BTC:    ${btc_meta['last_price']:.0f} | Risk: {btc_meta['last_risk']:.2f} {get_signal(btc_meta['last_risk'])}\n"
+        cycle_report += f"- ETH:    ${eth_meta['last_price']:.0f} | Risk: {eth_meta['last_risk']:.2f} {get_signal(eth_meta['last_risk'])}\n"
+        cycle_report += f"- GOLD:   ${gold_meta['last_price']:.1f} | Risk: {gold_meta['last_risk']:.2f} {get_signal(gold_meta['last_risk'])}\n"
+        cycle_report += f"- SILVER: ${silver_meta['last_price']:.1f} | Risk: {silver_meta['last_risk']:.2f} {get_signal(silver_meta['last_risk'])}\n"
+        cycle_report += f"- GDX:    ${gdx_meta['last_price']:.2f} | Risk: {gdx_meta['last_risk']:.2f} {get_signal(gdx_meta['last_risk'])}\n\n"
         
         cycle_report += "KEY METRICS:\n"
         cycle_report += f"- Gold/Silver Ratio: {gsr:.2f} ({'Accumulation' if gsr > 80 else 'Distribution'})\n"
@@ -321,11 +326,15 @@ Status vs 50W:  {meta['status_50w']}
                 elif eth_btc > 0.08:
                      macro_note = f"\n[MACRO CONTEXT]: ETH/BTC High ({eth_btc:.4f}). Alt Season Peaking? Caution.\n"
 
+            # Signal Logic
+            r = meta['last_risk']
+            signal_str = "🟢 [BUY]" if r < 0.3 else "🔴 [SELL]" if r > 0.75 else "🟡 [HOLD]"
+
             # Report Section
             section = f"""
 ASSET: {name} ({ticker})
 Price: ${meta['last_price']:.2f}
-RISK SCORE: {meta['last_risk']:.2f}  [{'BUY' if meta['last_risk']<0.3 else 'SELL' if meta['last_risk']>0.75 else 'HOLD'}]
+RISK SCORE: {meta['last_risk']:.2f}  {signal_str}
 {cowen_section}{macro_note}
 Validation Reliability: {val_metrics.get('score', 0)}/100
 (Correlation: {val_metrics.get('correlation', 0):.2f})
