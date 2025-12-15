@@ -266,7 +266,8 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     
     cowen_meta = {}
     
-    if ticker.endswith("-USD"):
+    # Apply Trend/Cowen Logic to Crypto AND Commodities (Trending Assets)
+    if ticker.endswith("-USD") or ticker in ["GC=F", "SI=F"]:
         # Calculate Daily approximations for Weekly bands
         # 20 Weeks = 140 Days
         sma_20w = df['Close'].rolling(window=140).mean()

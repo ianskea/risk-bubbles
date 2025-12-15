@@ -150,6 +150,66 @@ def generate_ai_analysis(ticker, price, risk, metrics):
     except Exception as e:
         return f"AI Error: {e}"
 
+def analyze_market_cycle():
+    """
+    Analyzes Macro Capital Rotation:
+    1. Gold/Silver Ratio (GSR) -> Precious Metals Cycle
+    2. ETH/BTC Ratio -> Crypto Risk Appetite
+    """
+    print("Analyzing Global Market Cycle...")
+    cycle_report = "GLOBAL MARKET CYCLE ANALYSIS\n" + "-"*30 + "\n"
+    
+    try:
+        # Fetch Benchmarks (using verify=False if needed or just standard)
+        # We need raw prices. Reuse analyze_asset but just take last price?
+        # Or simple fetch. specific fetch is lighter.
+        # Imporing fetch_data from risk_analyzer avoids circular dependency if careful
+        from enhanced_risk_analyzer import fetch_data
+        
+        # 1. Precious Metals
+        gold_df = fetch_data("GC=F")
+        silver_df = fetch_data("SI=F")
+        
+        if not gold_df.empty and not silver_df.empty:
+            gold_p = gold_df['Close'].iloc[-1]
+            silver_p = silver_df['Close'].iloc[-1]
+            gsr = gold_p / silver_p
+            
+            status = "NEUTRAL"
+            if gsr > 80: status = "ACCUMULATION (Safe Haven Flows -> Gold)"
+            elif gsr < 50: status = "DISTRIBUTION (Speculative Mania -> Silver)"
+            
+            cycle_report += f"GOLD/SILVER RATIO: {gsr:.2f}\n"
+            cycle_report += f"Phase: {status}\n\n"
+            
+        # 2. Crypto Rotation
+        btc_df = fetch_data("BTC-USD")
+        eth_df = fetch_data("ETH-USD")
+        
+        if not btc_df.empty and not eth_df.empty:
+            btc_p = btc_df['Close'].iloc[-1]
+            eth_p = eth_df['Close'].iloc[-1]
+            eth_btc = eth_p / btc_p
+            
+            status = "NEUTRAL"
+            if eth_btc < 0.05: status = "ACCUMULATION (Bitcoin Season -> Low Risk)"
+            elif eth_btc > 0.08: status = "DISTRIBUTION (Alt Season -> High Risk)"
+            
+            cycle_report += f"ETH/BTC RATIO:     {eth_btc:.4f}\n"
+            cycle_report += f"Phase: {status}\n"
+            
+    except Exception as e:
+        cycle_report += f"Error calculating cycle metrics: {e}\n"
+    
+    cycle_report += "="*60 + "\n\n"
+    
+    # Return both report text and raw data for context
+    context = {
+        "gsr": locals().get('gsr', 0),
+        "eth_btc": locals().get('eth_btc', 0)
+    }
+    return cycle_report, context
+
 def main():
     ensure_dirs()
     print("Starting Institutional Analysis Run...")
@@ -157,6 +217,10 @@ def main():
     report_path = os.path.join(OUTPUT_DIR, "institutional_analysis_report.txt")
     full_report = f"INSTITUTIONAL RISK REPORT - {datetime.now().strftime('%Y-%m-%d')}\n"
     full_report += "="*60 + "\n\n"
+    
+    # --- MACRO CYCLE ---
+    cycle_text, macro_context = analyze_market_cycle()
+    full_report += cycle_text
     
     for name, ticker in TICKERS.items():
         print(f"Processing {name}...")
@@ -188,12 +252,30 @@ Status vs 50W:  {meta['status_50w']}
 200W SMA (Bottom): ${meta['sma_200w']:.2f}
 """
 
+            # Macro Context Integration
+            macro_note = ""
+            # Silver Logic
+            if ticker == "SI=F":
+                gsr = macro_context.get('gsr', 0)
+                if gsr > 80:
+                    macro_note = f"\n[MACRO CONTEXT]: GSR is High ({gsr:.2f}). Silver is CHEAP vs Gold (Accumulation).\n"
+                elif gsr < 50:
+                    macro_note = f"\n[MACRO CONTEXT]: GSR is Low ({gsr:.2f}). Silver is EXPENSIVE vs Gold (Distribution Risk).\n"
+            
+            # Altcoin Logic (ETH, ADA, etc)
+            if ticker in ["ETH-USD", "ADA-USD"]:
+                eth_btc = macro_context.get('eth_btc', 0)
+                if eth_btc < 0.05:
+                     macro_note = f"\n[MACRO CONTEXT]: ETH/BTC Low ({eth_btc:.4f}). BTC Dominance High. Setup for Alt Rotation eventually.\n"
+                elif eth_btc > 0.08:
+                     macro_note = f"\n[MACRO CONTEXT]: ETH/BTC High ({eth_btc:.4f}). Alt Season Peaking? Caution.\n"
+
             # Report Section
             section = f"""
 ASSET: {name} ({ticker})
 Price: ${meta['last_price']:.2f}
 RISK SCORE: {meta['last_risk']:.2f}  [{'BUY' if meta['last_risk']<0.3 else 'SELL' if meta['last_risk']>0.75 else 'HOLD'}]
-{cowen_section}
+{cowen_section}{macro_note}
 Validation Reliability: {val_metrics.get('score', 0)}/100
 (Correlation: {val_metrics.get('correlation', 0):.2f})
 
