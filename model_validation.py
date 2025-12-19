@@ -11,120 +11,127 @@ def validate_model(df: pd.DataFrame, risk_col: str = 'risk_total', forward_windo
     Metrics:
     1. Risk-Return Correlation: Correlation between Risk Score and Future Returns. (Should be negative).
     2. Bucket Analysis: Avg return for High Risk vs Low Risk zones.
-    3. Calibration: If Risk=0.8, is price in 80th percentile of history?
     """
-    # Create Analysis Setup
-    if risk_col not in df.columns:
-        return {"error": f"Missing risk column '{risk_col}'"}
+    if len(df) < 200:
+        return {"score": 0, "reason": "Insufficient Data"}
 
-    val_df = df[['Close', risk_col]].dropna().copy()
-    
-    # Calculate Forward Returns (e.g., 30 days)
+    # Prep Data
+    val_df = df.copy()
     val_df['fwd_return'] = val_df['Close'].shift(-forward_window) / val_df['Close'] - 1
-    val_df.dropna(inplace=True)
+    val_df = val_df.dropna()
     
-    if len(val_df) < 100:
-        return {"error": "Insufficient data for validation (<100 samples)"}
+    if val_df.empty: return {"score": 0}
+
+    # 1. Regime Detection
+    # Is this a Trending Asset (Momentum) or Ranging (Mean Reversion)?
+    if 'sma_200' not in val_df.columns:
+        val_df['sma_200'] = val_df['Close'].rolling(200).mean()
     
-    # 1. Correlation
-    # We expect Meaningful Negative Correlation (Higher Risk -> Lower Future Return)
-    corr_pearson, p_pearson = pearsonr(val_df[risk_col], val_df['fwd_return'])
+    # Fill NaN for SMA calculation to avoid dropping too much data
+    val_df['sma_200'] = val_df['sma_200'].bfill()
+
+    trend_strength = (val_df['Close'] > val_df['sma_200']).mean()
+    # If Price is above 200 SMA more than 50% of the time, it's Momentum biased
+    is_momentum = trend_strength > 0.50
+    
+    regime_type = "MOMENTUM" if is_momentum else "MEAN_REVERSION"
+    
+    # 2. Base Metrics
     corr_rank, p_rank = spearmanr(val_df[risk_col], val_df['fwd_return'])
     
-    # 2. Bucket Analysis
-    # Define Regimes
+    # Buckets
     val_df['regime'] = pd.cut(val_df[risk_col], 
                               bins=[0, 0.3, 0.4, 0.6, 0.75, 1.0], 
                               labels=['Strong Buy', 'Buy', 'Hold', 'Reduce', 'Sell'])
-    
     bucket_perf = val_df.groupby('regime', observed=True)['fwd_return'].mean()
-    win_rate = val_df.groupby('regime', observed=True)['fwd_return'].apply(lambda x: (x > 0).mean())
-    
-    # 3. Simple Backtest (Signal-based)
-    # Strategy: Long when Risk < 0.4, Cash when Risk > 0.75?
-    # Simplified: Compare Top Decile vs Bottom Decile returns
-    top_decile_ret = val_df[val_df[risk_col] > 0.9]['fwd_return'].mean()
-    bottom_decile_ret = val_df[val_df[risk_col] < 0.1]['fwd_return'].mean()
-    
-    # Score the Model (0-100)
-    # Criteria:
-    # - Correlation < -0.1 (+30 pts)
-    # - Low Risk Return > High Risk Return (+30 pts)
-    # - Significant p-value (+20 pts)
-    # - Data quality (+20 pts)
-    
-    # Score the Model (0-100)
-    # Pivot to "Performance Based" rather than "Linear Correlation Based"
-    # Criteria:
-    # - Spread: Returns in Buy Zone > Sell Zone (+40 pts)
-    # - Safety: Win Rate in Buy Zone > Sell Zone (+20 pts)
-    # - Correlation: Negative slope (+20 pts)
-    # - Reliability: Data quantity/quality (+20 pts)
     
     score = 0
     
-    # 1. Performance Spread (40 pts)
-    # Primary Utility: Does buying low risk beat buying high risk?
-    avg_buy = bucket_perf.get('Strong Buy', bucket_perf.get('Buy', -999))
-    avg_sell = bucket_perf.get('Sell', bucket_perf.get('Reduce', 999))
-    
-    if avg_buy > avg_sell: score += 40
-    
-    # 2. Win Rate Spread (20 pts)
-    # Do we win more often in the buy zone?
-    wr_buy = win_rate.get('Strong Buy', win_rate.get('Buy', 0))
-    wr_sell = win_rate.get('Sell', win_rate.get('Reduce', 1))
-    
-    if wr_buy > wr_sell: score += 20
-    
-    # 3. Correlation (20 pts)
-    # We still want a general negative trend (higher risk = lower return)
-    if corr_rank < 0: score += 10
-    if corr_rank < -0.1: score += 10
-    
-    # 4. Reliability (20 pts)
-    if p_rank < 0.10: score += 10 # Relaxed significance
-    if len(val_df) > 200: score += 10
-    
-    report = {
+    # 3. Adaptive Scoring
+    if is_momentum:
+        # --- MOMENTUM VALIDATION ---
+        # A. Upside Capture (Did we stay in during the pump?)
+        # Look at Top 20% of Future Returns. Was Risk moderate?
+        top_quintile_threshold = val_df['fwd_return'].quantile(0.8)
+        top_perf_months = val_df[val_df['fwd_return'] > top_quintile_threshold]
+        avg_risk_in_pump = top_perf_months[risk_col].mean()
+        
+        # If Risk was < 0.5 during pumps, EXCELLENT (+40)
+        # If Risk was < 0.6 during pumps, GOOD (+20)
+        if avg_risk_in_pump < 0.50: score += 40
+        elif avg_risk_in_pump < 0.60: score += 20
+        
+        # B. Downside Protection (Did we find the top?)
+        # Look at Bottom 20% of Future Returns. Was Risk high?
+        wost_quintile_threshold = val_df['fwd_return'].quantile(0.2)
+        crash_months = val_df[val_df['fwd_return'] < wost_quintile_threshold]
+        avg_risk_in_crash = crash_months[risk_col].mean()
+        
+        # Adjusted Targets: 0.5 is "High" enough for a dampened model
+        if avg_risk_in_crash > 0.50: score += 40
+        elif avg_risk_in_crash > 0.35: score += 20
+        
+        # C. Data Hygiene (+20)
+        if len(val_df) > 365: score += 20
+
+    else:
+        # --- MEAN REVERSION VALIDATION (Original Logic) ---
+        # 1. Spread (Buy Low > Sell High) (+40)
+        avg_buy = bucket_perf.get('Strong Buy', bucket_perf.get('Buy', -999))
+        avg_sell = bucket_perf.get('Sell', bucket_perf.get('Reduce', 999))
+        if avg_buy > avg_sell: score += 40
+        
+        # 2. Win Rate (+20)
+        win_rate = val_df.groupby('regime', observed=True)['fwd_return'].apply(lambda x: (x > 0).mean())
+        wr_buy = win_rate.get('Strong Buy', win_rate.get('Buy', 0))
+        wr_sell = win_rate.get('Sell', win_rate.get('Reduce', 1))
+        if wr_buy > wr_sell: score += 20
+        
+        # 3. Correlation (Negative) (+20)
+        if corr_rank < -0.1: score += 20
+        
+        # 4. Data (+20)
+        if len(val_df) > 365: score += 20
+        
+    return {
         "score": score,
+        "regime_type": regime_type,
         "n_samples": len(val_df),
         "correlation": corr_rank,
-        "p_value": p_rank,
-        "avg_return_buy_zone": bucket_perf.get('Strong Buy', 0.0),
-        "avg_return_sell_zone": bucket_perf.get('Sell', 0.0),
-        "spread": bottom_decile_ret - top_decile_ret,
-        "win_rate_buy": win_rate.get('Strong Buy', 0.0),
-        "win_rate_sell": win_rate.get('Sell', 0.0) # Actually win rate for sell zone means "did it go up?" (hopefully low)
+        "avg_risk_pump": locals().get('avg_risk_in_pump', 0),
+        "avg_risk_crash": locals().get('avg_risk_in_crash', 0),
+        "avg_return_buy_zone": bucket_perf.get('Strong Buy', bucket_perf.get('Buy', 0)),
+        "avg_return_sell_zone": bucket_perf.get('Sell', bucket_perf.get('Reduce', 0)),
+        "win_rate_buy": locals().get('wr_buy', 0),
+        "win_rate_sell": locals().get('wr_sell', 0)
     }
-    
-    return report
 
 def generate_validation_report_text(ticker: str, metrics: dict) -> str:
     if metrics.get("error"):
-        return f"""
-VALIDATION REPORT: {ticker}
-------------------------------------------------
-Error: {metrics.get('error')}
-------------------------------------------------
-"""
-    return f"""
+        return f"VALIDATION REPORT: {ticker}\nError: {metrics.get('error')}"
+
+    txt = f"""
 VALIDATION REPORT: {ticker}
 ------------------------------------------------
 Model Score:        {metrics.get('score', 0)}/100
+Regime:             {metrics.get('regime_type', 'N/A')}
 Data Points:        {metrics.get('n_samples', 0)}
-
-Predictive Power:
-- Rank Correlation: {metrics.get('correlation', 0):.3f} (Ideal: < -0.2)
-- Significance (p): {metrics.get('p_value', 1.0):.4f} (Ideal: < 0.05)
-
-Performance Spread (30-day fwd):
-- Strong Buy Zone:  {metrics.get('avg_return_buy_zone', 0)*100:.1f}% avg return
-- Sell Zone:        {metrics.get('avg_return_sell_zone', 0)*100:.1f}% avg return
-- Opportunity Spread: {metrics.get('spread', 0)*100:.1f}% 
-
-Win Rates (Prob. of Positive Return):
-- Buy Zone:         {metrics.get('win_rate_buy', 0)*100:.0f}%
-- Sell Zone:        {metrics.get('win_rate_sell', 0)*100:.0f}% (Lower is better for avoiding crash)
-------------------------------------------------
+Correlation:        {metrics.get('correlation', 0):.3f}
 """
+
+    if metrics.get('regime_type') == 'MOMENTUM':
+        txt += f"""
+Momentum Metrics:
+- Avg Risk in Pump: {metrics.get('avg_risk_pump', 0):.2f} (Target < 0.5)
+- Avg Risk in Crash: {metrics.get('avg_risk_crash', 0):.2f} (Target > 0.4)
+"""
+    else:
+        txt += f"""
+Mean Reversion Metrics:
+- Buy Zone Return:  {metrics.get('avg_return_buy_zone', 0)*100:.1f}%
+- Sell Zone Return: {metrics.get('avg_return_sell_zone', 0)*100:.1f}%
+- Win Rate Spread:  {(metrics.get('win_rate_buy', 0) - metrics.get('win_rate_sell', 0))*100:.1f}%
+"""
+        
+    txt += "------------------------------------------------"
+    return txt

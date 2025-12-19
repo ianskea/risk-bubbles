@@ -380,6 +380,7 @@ def main():
         
         # Model Risk Label
         model_risk_label = "LOW" if asset['score'] >= 80 else "MEDIUM"
+        regime_label = f"[{asset['val_metrics'].get('regime_type', 'STANDARD')}]"
         
         # Cowen Context
         meta = asset['meta']
@@ -404,7 +405,7 @@ def main():
 ASSET: {asset['name']} ({asset['ticker']})
 Price: ${asset['price']:.2f}
 RISK SCORE: {r:.2f}  {signal_str}
-Model Risk: {model_risk_label} (Score: {asset['score']}/100)
+Model Risk: {model_risk_label} (Score: {asset['score']}/100) {regime_label}
 {cowen_txt}{macro_note}
 
 AI INSIGHT:
