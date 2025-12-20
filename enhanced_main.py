@@ -3,7 +3,7 @@ import os
 import time
 import logging
 from datetime import datetime
-from PIL import Image # For potential future image processing
+# from PIL import Image # For potential future image processing
 from openai import OpenAI
 from dotenv import load_dotenv
 import matplotlib.pyplot as plt
@@ -104,10 +104,10 @@ def plot_comprehensive_analysis(ticker_name, ticker_symbol, df):
     ax2 = fig.add_subplot(gs[0, 1])
     ax2.set_title("Composite Risk Score (0-1)")
     ax2.plot(df.index, df['risk_total'], color='blue', lw=1.5)
-    ax2.axhline(0.8, color='red', ls='--', alpha=0.5)
-    ax2.axhline(0.2, color='green', ls='--', alpha=0.5)
-    ax2.fill_between(df.index, 0.8, 1.0, color='red', alpha=0.1)
-    ax2.fill_between(df.index, 0.0, 0.2, color='green', alpha=0.1)
+    ax2.axhline(0.7, color='red', ls='--', alpha=0.5)
+    ax2.axhline(0.3, color='green', ls='--', alpha=0.5)
+    ax2.fill_between(df.index, 0.7, 1.0, color='red', alpha=0.1)
+    ax2.fill_between(df.index, 0.0, 0.3, color='green', alpha=0.1)
     ax2.grid(True, alpha=0.2)
     
     # 3. Valuation Risk (Mid Left)
@@ -145,20 +145,45 @@ def plot_comprehensive_analysis(ticker_name, ticker_symbol, df):
     plt.close()
     return path
 
-def generate_ai_analysis(ticker, price, risk, metrics):
+def generate_ai_analysis(ticker, price, risk, metrics, meta):
     if not client:
         return "AI Analysis not available (No API Key)"
+
+    def fmt_pct(val):
+        return "N/A" if val is None or pd.isna(val) else f"{val*100:.1f}%"
+        
+    ret = meta.get("ret", {})
+    ma50 = fmt_pct(meta.get("ma50_dist"))
+    ma200 = fmt_pct(meta.get("ma200_dist"))
+    dd_cur = fmt_pct(meta.get("drawdown_current"))
+    dd_max = fmt_pct(meta.get("drawdown_max"))
+    ret_30 = fmt_pct(ret.get("ret_30d"))
+    ret_90 = fmt_pct(ret.get("ret_90d"))
+    ret_365 = fmt_pct(ret.get("ret_365d"))
         
     # Optimized Prompt
     prompt = f"""
-    Analyze {ticker}. Price: ${price:.2f}. 
-    Composite Risk Score: {risk:.2f} (0=Buy, 1=Sell).
-    Validation Score: {metrics.get('score')}/100 (Model is VALIDATED).
+    Provide a professional Institutional Risk Assessment for {ticker}.
+    Current Price: ${price:.2f}
+    Composite Risk Score: {risk:.2f} (0.0 = Buy/Value, 1.0 = Sell/Bubble)
     
-    Provide a concise Institutional Assessment.
-    1. Direct recommendation based on risk score.
-    2. Key drivers (Volatility, Valuation, Momentum).
-    DO NOT discuss "Model Trustworthiness" (it is already passed). Focus on the ASSET risk.
+    Interpretation Rules for Composite Risk Score:
+    - 0.0 to 0.30: Accumulate/Buy/Value Opportunity.
+    - 0.30 to 0.70: Hold/Neutral/Caution.
+    - 0.70 to 1.00: Scale Out/Reduce/Sell/Bubble Risk.
+    
+    Context:
+    - Performance: 30d {ret_30}, 90d {ret_90}, 365d {ret_365}
+    - Trend: Distance to 50D MA {ma50}, 200D MA {ma200}
+    - Drawdown: Current {dd_cur}, Max {dd_max}
+    - Model Validation Score: {metrics.get('score', 0)}/100
+
+    Structure your response clearly:
+    1. **Institutional Action Bias**: (Must align with Interpretation Rules above)
+    2. **Key Risk Drivers**: Analysis of valuation, momentum, and volatility.
+    3. **Structural Context**: Note if price is above/below key moving averages and the significance of the current drawdown.
+
+    Ensure the response is complete, objective, and does not cut off.
     """
     
     max_retries = 3
@@ -170,8 +195,8 @@ def generate_ai_analysis(ticker, price, risk, metrics):
             response = client.chat.completions.create(
                 model="deepseek-chat",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=150,
-                timeout=20  # Increased timeout slightly
+                max_tokens=500,
+                timeout=30
             )
             return response.choices[0].message.content.strip()
             
@@ -248,9 +273,9 @@ def analyze_market_cycle():
         # Status Label
         status_label = "MODERATE"
         if composite_score < 0.2: status_label = "EXTREME LOW (BUY ALL)"
-        elif composite_score < 0.4: status_label = "LOW (ACCUMULATE)"
+        elif composite_score < 0.3: status_label = "LOW (ACCUMULATE)"
         elif composite_score < 0.6: status_label = "MODERATE"
-        elif composite_score < 0.75: status_label = "HIGH (SCALE OUT)"
+        elif composite_score < 0.7: status_label = "HIGH (WATCH FOR SELL)"
         elif composite_score < 0.85: status_label = "VERY HIGH (WARNING)"
         else: status_label = "EXTREME (SELL)"
 
@@ -260,7 +285,7 @@ def analyze_market_cycle():
         
         def get_signal(r):
             if r < 0.3: return "🟢 [BUY]"
-            if r > 0.75: return "🔴 [SELL]"
+            if r > 0.70: return "🔴 [SELL]"
             return "🟡 [HOLD]"
         
         cycle_report += "ASSET STATUS:\n"
@@ -318,11 +343,31 @@ def main():
         print(f"Analyzing {name} ({ticker})...")
         try:
             df, _, meta = analyze_asset(ticker)
-            if df.empty: continue
+            if meta.get("reason"):
+                invalid_assets.append({
+                    "name": name,
+                    "ticker": ticker,
+                    "reason": meta["reason"]
+                })
+                continue
+            if df.empty:
+                invalid_assets.append({
+                    "name": name,
+                    "ticker": ticker,
+                    "reason": "No data returned"
+                })
+                continue
             
             # Run Validation
             val_metrics = validate_model(df)
             score = val_metrics.get('score', 0)
+            if val_metrics.get("error"):
+                invalid_assets.append({
+                    "name": name,
+                    "ticker": ticker,
+                    "reason": val_metrics["error"]
+                })
+                continue
             
             # --- INSTITUTIONAL HARD GATE ---
             # Score < 60: FAIL. NO SIGNAL.
@@ -334,8 +379,8 @@ def main():
             asset_data = {
                 "name": name,
                 "ticker": ticker,
-                "price": meta['last_price'],
-                "risk": meta['last_risk'],
+                "price": round(meta['last_price'], 2),
+                "risk": round(meta['last_risk'], 2),
                 "score": score,
                 "meta": meta,
                 "val_metrics": val_metrics
@@ -345,7 +390,7 @@ def main():
             
             if is_valid:
                 # Generate AI Insight only for valid
-                asset_data["ai_text"] = generate_ai_analysis(name, meta['last_price'], meta['last_risk'], val_metrics)
+                asset_data["ai_text"] = generate_ai_analysis(name, meta['last_price'], meta['last_risk'], val_metrics, meta)
                 valid_assets.append(asset_data)
             else:
                 asset_data["reason"] = "Validation Failure (<60)"
@@ -376,37 +421,27 @@ def main():
         r = asset['risk']
         
         # Signal Logic
-        signal_str = "🟢 [BUY]" if r < 0.3 else "🔴 [SELL]" if r > 0.75 else "🟡 [HOLD]"
-        
-        # Model Risk Label
-        model_risk_label = "LOW" if asset['score'] >= 80 else "MEDIUM"
-        regime_label = f"[{asset['val_metrics'].get('regime_type', 'STANDARD')}]"
-        
-        # Cowen Context
-        meta = asset['meta']
-        cowen_txt = ""
-        if "bmsb_20w_sma" in meta:
-            cowen_txt = f"\n[CONTEXT: Ben Cowen Framework]\n"
-            cowen_txt += f"Price vs BMSB: {meta['status_bmsb']} (${meta['bmsb_20w_sma']:.0f})\n"
-            cowen_txt += f"Price vs 50W:  {meta['status_50w']} (${meta['sma_50w']:.0f})\n"
+        signal_str = "🟢 [BUY]" if r < 0.3 else "🔴 [SELL]" if r > 0.70 else "🟡 [HOLD]"
 
-        # Macro Context
-        macro_note = ""
-        if asset['ticker'] == "SI=F":
-             gsr = macro_context.get('gsr', 0)
-             if gsr > 80: macro_note = f"\n[MACRO]: GSR High ({gsr:.0f}). Accumulation Favored."
-             elif gsr < 50: macro_note = f"\n[MACRO]: GSR Low ({gsr:.0f}). Distribution Warned."
-        
-        if asset['ticker'] in ["ETH-USD", "ADA-USD"]:
-             eth_btc = macro_context.get('eth_btc', 0)
-             if eth_btc < 0.05: macro_note = f"\n[MACRO]: ETH/BTC Low ({eth_btc:.4f}). BTC Dominance Phase."
-        
+        meta = asset['meta']
+        ma_context = []
+        if meta.get("ma50_dist") is not None and not pd.isna(meta.get("ma50_dist")):
+            ma_context.append(f"MA50 dist: {meta['ma50_dist']*100:.1f}%")
+        if meta.get("ma200_dist") is not None and not pd.isna(meta.get("ma200_dist")):
+            ma_context.append(f"MA200 dist: {meta['ma200_dist']*100:.1f}%")
+        dd_context = []
+        if meta.get("drawdown_current") is not None and not pd.isna(meta.get("drawdown_current")):
+            max_dd_val = meta.get('drawdown_max', 0)
+            max_dd_text = f"{max_dd_val*100:.1f}%" if not pd.isna(max_dd_val) else "N/A"
+            dd_context.append(f"Drawdown now: {meta['drawdown_current']*100:.1f}% (max {max_dd_text})")
+        context_line = "; ".join(ma_context + dd_context) if (ma_context or dd_context) else "N/A"
+
         section = f"""
 ASSET: {asset['name']} ({asset['ticker']})
 Price: ${asset['price']:.2f}
 RISK SCORE: {r:.2f}  {signal_str}
-Model Risk: {model_risk_label} (Score: {asset['score']}/100) {regime_label}
-{cowen_txt}{macro_note}
+Validation Score: {asset['score']}/100
+Context: {context_line}
 
 AI INSIGHT:
 {asset['ai_text']}
@@ -415,19 +450,15 @@ AI INSIGHT:
         full_report += section
 
     # 3. FAILED MODELS
-    full_report += "\nSECTION 2: MODEL FAILURE / NO SIGNAL (Validation < 60)\n"
-    full_report += "WARNING: These assets failed backtest validation. Do not trade based on Risk Score.\n"
+    full_report += "\nSECTION 2: MODEL FAILURE / NO SIGNAL\n"
+    full_report += "These assets were not actioned due to validation/history/volume gates.\n"
     full_report += "="*60 + "\n"
-    full_report += f"{'ASSET':<20} | {'PRICE':<10} | {'RISK (IGNORED)':<15} | {'SCORE':<5} | {'STATUS'}\n"
-    full_report += "-"*80 + "\n"
+    full_report += f"{'ASSET':<20} | {'REASON'}\n"
+    full_report += "-"*60 + "\n"
     
     for asset in invalid_assets:
-        # Status
-        status = "⚪ NO SIGNAL"
-        if asset['score'] < 20: status += " (CRITICAL FAIL)"
-        elif asset['score'] < 40: status += " (POOR FIT)"
-        
-        full_report += f"{asset['name']:<20} | ${asset['price']:<10.2f} | {asset['risk']:<15.2f} | {asset['score']:<5} | {status}\n"
+        reason = asset.get("reason", "Validation < 60")
+        full_report += f"{asset.get('name','N/A'):<20} | {reason}\n"
         
     # Save
     with open(report_path, "w") as f:

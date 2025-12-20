@@ -221,6 +221,9 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
         return pd.DataFrame(), {}, {}
 
     # 2. Valuation Risk (40%)
+    if len(df) < 200:
+        # Too little history for stable valuation; bail early
+        return pd.DataFrame(), {}, {"ticker": ticker, "reason": "Insufficient history (<200 bars)"}
     val_risk, val_debug = calculate_valuation_risk(df)
     df['risk_valuation'] = val_risk
     
@@ -234,26 +237,30 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     df['risk_volatility'] = normalize_series(bb_width, lookback=252)
     
     # 5. Volume Risk (15%) - Enhanced with MFI
-    # If Volume exists, use MFI (Money Flow Index) to detect smart money flow
-    if 'Volume' in df.columns and df['Volume'].notna().any() and 'High' in df.columns:
+    has_volume = 'Volume' in df.columns and df['Volume'].notna().any() and 'High' in df.columns
+    if has_volume:
         mfi = calculate_mfi(df['High'], df['Low'], df['Close'], df['Volume'])
         df['mfi'] = mfi
-        # Normalize MFI: High MFI (>80) = Overbought/Risk. Low MFI (<20) = Oversold/Opp.
         df['risk_volume'] = normalize_series(mfi, lookback=252)
     else:
         df['risk_volume'] = np.nan
 
     weights = {
-        'risk_valuation': 0.30,
-        'risk_momentum': 0.20,
-        'risk_volatility': 0.25,
-        'risk_volume': 0.25
+        'risk_valuation': 0.40,
+        'risk_momentum': 0.25,
+        'risk_volatility': 0.20
     }
+    if has_volume:
+        weights['risk_volume'] = 0.15
+    else:
+        # Renormalize if volume is missing
+        weights = {k: v / sum(weights.values()) for k, v in weights.items()}
 
     def _safe_factor(name: str) -> pd.Series:
         return df.get(name, pd.Series(np.nan, index=df.index)).fillna(0.5)
 
-    df['risk_total'] = sum(_safe_factor(name) * weight for name, weight in weights.items())
+    total_weight = sum(weights.values())
+    df['risk_total'] = sum(_safe_factor(name) * (weight / total_weight) for name, weight in weights.items())
 
     # Clean early NaNs in inputs without discarding full history
     df = df.dropna(subset=['risk_total'])
@@ -308,17 +315,46 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
         mask = (bull_trend) & (df['risk_total'] < 0.9)
         df.loc[mask, 'risk_total'] = df.loc[mask, 'risk_total'] * 0.85
 
+    # --- Cycle / context metrics for AI prompt ---
+    closes = df['Close']
+    last_price = closes.iloc[-1]
+    def pct_return(days: int) -> float:
+        if len(closes) >= days and closes.iloc[-days] > 0:
+            return (last_price / closes.iloc[-days]) - 1
+        return np.nan
+    returns = {
+        "ret_7d": pct_return(7),
+        "ret_30d": pct_return(30),
+        "ret_90d": pct_return(90),
+        "ret_365d": pct_return(365)
+    }
+    ma50_val = closes.rolling(50).mean().iloc[-1]
+    ma200_val = closes.rolling(200).mean().iloc[-1]
+    ma50_dist = (last_price / ma50_val - 1) if not np.isnan(ma50_val) and ma50_val > 0 else np.nan
+    ma200_dist = (last_price / ma200_val - 1) if not np.isnan(ma200_val) and ma200_val > 0 else np.nan
+    rolling_max = closes.cummax()
+    drawdown_series = closes / rolling_max - 1
+    current_dd = drawdown_series.iloc[-1]
+    max_dd = drawdown_series.min()
+
     # Metadata
     last_risk = df['risk_total'].iloc[-1]
     metadata = {
         "ticker": ticker,
-        "last_price": df['Close'].iloc[-1],
+        "last_price": last_price,
         "last_risk": last_risk,
         "rating": "BUY" if last_risk < 0.3 else "SELL" if last_risk > 0.75 else "HOLD",
+        "ma50_dist": ma50_dist,
+        "ma200_dist": ma200_dist,
+        "ret": returns,
+        "drawdown_current": current_dd,
+        "drawdown_max": max_dd,
+        "actionable": has_volume,
+        "reason": None if has_volume else "Missing volume data",
         **cowen_meta
     }
     
-    return df, {}, metadata
+    return df, cowen_meta, metadata
 
 def calculate_mlr(gold_df, gdx_df, period=60):
     """

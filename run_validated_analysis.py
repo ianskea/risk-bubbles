@@ -25,13 +25,19 @@ def run_suite():
     for ticker in assets:
         print(f"\n--- Processing {ticker} ---")
         try:
-            df, _, _ = analyze_asset(ticker)
+            df, _, meta = analyze_asset(ticker)
+            if meta.get("reason"):
+                print(f"Skipping {ticker}: {meta['reason']}")
+                continue
             if df.empty:
                 print(f"Skipping {ticker} (No Data)")
                 continue
                 
             metrics = validate_model(df)
             print(generate_validation_report_text(ticker, metrics))
+            if metrics.get("error"):
+                print(f"Validation skipped for {ticker}: {metrics['error']}")
+                continue
             results.append(metrics.get('score', 0))
         except Exception as e:
             print(f"Error validating {ticker}: {e}")
@@ -48,12 +54,18 @@ def run_single_validation():
     ticker = input("Enter Ticker Symbol (e.g., BTC-USD, AAPL): ").strip().upper()
     print(f"Validating {ticker}...")
     try:
-        df, _, _ = analyze_asset(ticker)
+        df, _, meta = analyze_asset(ticker)
+        if meta.get("reason"):
+            print(f"Not actionable: {meta['reason']}")
+            return
         if df.empty:
             print("No data found.")
             return
         
         metrics = validate_model(df)
+        if metrics.get("error"):
+            print(f"Validation skipped: {metrics['error']}")
+            return
         print(generate_validation_report_text(ticker, metrics))
     except Exception as e:
         print(f"Error: {e}")
@@ -63,6 +75,9 @@ def run_quick_check():
     print(f"Analyzing {ticker}...")
     try:
         df, _, meta = analyze_asset(ticker)
+        if meta.get("reason"):
+            print(f"Not actionable: {meta['reason']}")
+            return
         if df.empty:
             print("No data found.")
             return
