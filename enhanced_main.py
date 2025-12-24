@@ -167,10 +167,13 @@ def generate_ai_analysis(ticker, price, risk, metrics, meta):
     Current Price: ${price:.2f}
     Composite Risk Score: {risk:.2f} (0.0 = Buy/Value, 1.0 = Sell/Bubble)
     
-    Interpretation Rules for Composite Risk Score:
-    - Less than 0.30: Accumulate/Buy/Value Opportunity.
-    - 0.30 to 0.70: Hold/Neutral/Caution.
-    - Greater than 0.70: Scale Out/Reduce/Sell/Bubble Risk.
+    Interpretation Rules (v2.0 Asymmetric):
+    - Value Zone (< 0.30): Institutional Accumulation (Buy).
+    - Danger Zone: Redlines vary by asset:
+        - Crypto (BTC/ETH): > 0.85
+        - Broad Market (VGS/MQG): > 0.80
+        - Satellite/Miners: > 0.75
+    - If risk is below Danger Zone but high, reduce to Moonbag.
     
     Context:
     - Performance: 30d {ret_30}, 90d {ret_90}, 365d {ret_365}
@@ -232,9 +235,13 @@ def analyze_market_cycle():
         gold_df, gold_meta = safe_asset("GC=F")
         silver_df, silver_meta = safe_asset("SI=F")
 
-        def get_signal(r):
-            if r < 0.3: return "🟢 [BUY]"
-            if r > 0.70: return "🔴 [SELL]"
+        def get_signal(ticker_symbol, r):
+            # Asymmetric Logic
+            exit_t = 0.85 if "USD" in ticker_symbol else 0.80 if "VGS" in ticker_symbol or "MQG" in ticker_symbol else 0.75
+            buy_t = 0.30
+            
+            if r < buy_t: return "🟢 [BUY]"
+            if r > exit_t: return "🔴 [SELL]"
             return "🟡 [HOLD]"
 
         # Ratios for color
@@ -242,10 +249,10 @@ def analyze_market_cycle():
         eth_btc = eth_meta['last_price'] / btc_meta['last_price'] if btc_meta['last_price'] else 0
 
         cycle_report += "ASSET STATUS (CONTEXT):\n"
-        cycle_report += f"- BTC:    ${btc_meta['last_price']:.0f} | Risk: {round(btc_meta['last_risk'],2):.2f} {get_signal(round(btc_meta['last_risk'],2))}\n"
-        cycle_report += f"- ETH:    ${eth_meta['last_price']:.0f} | Risk: {round(eth_meta['last_risk'],2):.2f} {get_signal(round(eth_meta['last_risk'],2))}\n"
-        cycle_report += f"- GOLD:   ${gold_meta['last_price']:.1f} | Risk: {round(gold_meta['last_risk'],2):.2f} {get_signal(round(gold_meta['last_risk'],2))}\n"
-        cycle_report += f"- SILVER: ${silver_meta['last_price']:.1f} | Risk: {round(silver_meta['last_risk'],2):.2f} {get_signal(round(silver_meta['last_risk'],2))}\n\n"
+        cycle_report += f"- BTC:    ${btc_meta['last_price']:.0f} | Risk: {round(btc_meta['last_risk'],2):.2f} {get_signal('BTC-USD', round(btc_meta['last_risk'],2))}\n"
+        cycle_report += f"- ETH:    ${eth_meta['last_price']:.0f} | Risk: {round(eth_meta['last_risk'],2):.2f} {get_signal('ETH-USD', round(eth_meta['last_risk'],2))}\n"
+        cycle_report += f"- GOLD:   ${gold_meta['last_price']:.1f} | Risk: {round(gold_meta['last_risk'],2):.2f} {get_signal('GC=F', round(gold_meta['last_risk'],2))}\n"
+        cycle_report += f"- SILVER: ${silver_meta['last_price']:.1f} | Risk: {round(silver_meta['last_risk'],2):.2f} {get_signal('SI=F', round(silver_meta['last_risk'],2))}\n\n"
         
         cycle_report += "KEY METRICS (COLOR ONLY):\n"
         cycle_report += f"- Gold/Silver Ratio: {gsr:.2f}\n"
@@ -366,8 +373,9 @@ def main():
     for asset in valid_assets:
         r = asset['risk']
         
-        # Signal Logic
-        signal_str = "🟢 [BUY]" if r < 0.3 else "🔴 [SELL]" if r > 0.70 else "🟡 [HOLD]"
+        # Signal Logic (v2.0 Asymmetric)
+        exit_t = 0.85 if "USD" in asset['ticker'] else 0.80 if "VGS" in asset['ticker'] or "MQG" in asset['ticker'] else 0.75
+        signal_str = "🟢 [BUY]" if r < 0.3 else "🔴 [SELL]" if r > exit_t else "🟡 [HOLD]"
 
         meta = asset['meta']
         ma_context = []
