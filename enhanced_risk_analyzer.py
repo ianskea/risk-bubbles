@@ -217,8 +217,8 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     try:
         df = fetch_data(ticker)
     except Exception as e:
-        print(f"Error: {e}")
-        return pd.DataFrame(), {}, {}
+        # print(f"Error fetching {ticker}: {e}")
+        return pd.DataFrame(), {}, {"ticker": ticker, "reason": f"Fetch Failure: {str(e)}"}
 
     # 2. Valuation Risk (40%)
     if len(df) < 200:
