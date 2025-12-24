@@ -168,9 +168,9 @@ def generate_ai_analysis(ticker, price, risk, metrics, meta):
     Composite Risk Score: {risk:.2f} (0.0 = Buy/Value, 1.0 = Sell/Bubble)
     
     Interpretation Rules for Composite Risk Score:
-    - 0.0 to 0.30: Accumulate/Buy/Value Opportunity.
+    - Less than 0.30: Accumulate/Buy/Value Opportunity.
     - 0.30 to 0.70: Hold/Neutral/Caution.
-    - 0.70 to 1.00: Scale Out/Reduce/Sell/Bubble Risk.
+    - Greater than 0.70: Scale Out/Reduce/Sell/Bubble Risk.
     
     Context:
     - Performance: 30d {ret_30}, 90d {ret_90}, 365d {ret_365}
@@ -269,6 +269,8 @@ def analyze_market_cycle():
                           (macro_risk * 0.25) + \
                           (china_risk * 0.15) + \
                           (social_risk * 0.10)
+        
+        composite_score = round(composite_score, 2)
                           
         # Status Label
         status_label = "MODERATE"
@@ -289,11 +291,11 @@ def analyze_market_cycle():
             return "🟡 [HOLD]"
         
         cycle_report += "ASSET STATUS:\n"
-        cycle_report += f"- BTC:    ${btc_meta['last_price']:.0f} | Risk: {btc_meta['last_risk']:.2f} {get_signal(btc_meta['last_risk'])}\n"
-        cycle_report += f"- ETH:    ${eth_meta['last_price']:.0f} | Risk: {eth_meta['last_risk']:.2f} {get_signal(eth_meta['last_risk'])}\n"
-        cycle_report += f"- GOLD:   ${gold_meta['last_price']:.1f} | Risk: {gold_meta['last_risk']:.2f} {get_signal(gold_meta['last_risk'])}\n"
-        cycle_report += f"- SILVER: ${silver_meta['last_price']:.1f} | Risk: {silver_meta['last_risk']:.2f} {get_signal(silver_meta['last_risk'])}\n"
-        cycle_report += f"- GDX:    ${gdx_meta['last_price']:.2f} | Risk: {gdx_meta['last_risk']:.2f} {get_signal(gdx_meta['last_risk'])}\n\n"
+        cycle_report += f"- BTC:    ${btc_meta['last_price']:.0f} | Risk: {round(btc_meta['last_risk'],2):.2f} {get_signal(round(btc_meta['last_risk'],2))}\n"
+        cycle_report += f"- ETH:    ${eth_meta['last_price']:.0f} | Risk: {round(eth_meta['last_risk'],2):.2f} {get_signal(round(eth_meta['last_risk'],2))}\n"
+        cycle_report += f"- GOLD:   ${gold_meta['last_price']:.1f} | Risk: {round(gold_meta['last_risk'],2):.2f} {get_signal(round(gold_meta['last_risk'],2))}\n"
+        cycle_report += f"- SILVER: ${silver_meta['last_price']:.1f} | Risk: {round(silver_meta['last_risk'],2):.2f} {get_signal(round(silver_meta['last_risk'],2))}\n"
+        cycle_report += f"- GDX:    ${gdx_meta['last_price']:.2f} | Risk: {round(gdx_meta['last_risk'],2):.2f} {get_signal(round(gdx_meta['last_risk'],2))}\n\n"
         
         cycle_report += "KEY METRICS:\n"
         cycle_report += f"- Gold/Silver Ratio: {gsr:.2f} ({'Accumulation' if gsr > 80 else 'Distribution'})\n"
