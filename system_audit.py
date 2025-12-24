@@ -22,20 +22,34 @@ class QARunner:
     def run_command(self, cmd_list, description):
         print(f"🔄 Running {description}...")
         start_time = time.time()
-        try:
-            result = subprocess.run(
-                cmd_list, 
-                capture_output=True, 
-                text=True, 
-                check=True
-            )
-            duration = time.time() - start_time
-            print(f"✅ {description} Complete ({duration:.2f}s)")
-            return result.stdout
-        except subprocess.CalledProcessError as e:
+        
+        # Use Popen to stream output in real-time
+        process = subprocess.Popen(
+            cmd_list,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, # Merge stderr into stdout
+            text=True,
+            bufsize=1 # Line buffered
+        )
+        
+        captured_output = []
+        
+        # Read stdout line by line
+        for line in process.stdout:
+            print(line, end='') # Print to console essentially immediately
+            captured_output.append(line)
+            
+        process.wait()
+        
+        if process.returncode != 0:
             print(f"❌ Error running {description}:")
-            print(e.stderr)
+            # Stdout/stderr already printed above
             sys.exit(1)
+
+        duration = time.time() - start_time
+        print(f"✅ {description} Complete ({duration:.2f}s)")
+        
+        return "".join(captured_output)
 
     def parse_institutional_report(self):
         """Extracts risk scores from the main report file."""
