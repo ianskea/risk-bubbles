@@ -39,6 +39,28 @@ def add_holding(args):
     else:
         print(f"❌ Failed to add holding. Check if entity '{args.entity}' exists.")
 
+def list_assets():
+    data, proxies, configs = portfolio_db.get_asset_defs()
+    if not configs:
+        print("No assets found in registry.")
+        return
+    
+    print(f"\n--- Institutional Asset Registry ---")
+    print(f"{'Ticker':<12} {'Tier':<10} {'Proxy':<12} {'Base%':<8} {'Yield%':<8} {'Custody':<12}")
+    print("-" * 75)
+    for ticker, cfg in configs.items():
+        yld = data[ticker][1]
+        proxy = proxies[ticker] if proxies[ticker] else "None"
+        print(f"{ticker:<12} {cfg['tier']:<10} {proxy:<12} {cfg['base']*100:<7.1f}% {yld*100:<7.1f}% {cfg['custody']:<12}")
+
+def add_asset(args):
+    portfolio_db.add_asset(
+        args.ticker, args.tier, args.proxy, args.base, 
+        args.min, args.max, args.exit, args.reduce, args.moon, 
+        args.yield_pa, args.custody
+    )
+    print(f"✅ Registered asset '{args.ticker}' in the Institutional Registry.")
+
 def clear_holdings(entity_name):
     import sqlite3
     entity = portfolio_db.get_entity_info(entity_name)
@@ -56,25 +78,41 @@ def clear_holdings(entity_name):
         print(f"✅ Cleared all holdings for '{entity_name}'.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Portfolio Holdings Manager")
+    parser = argparse.ArgumentParser(description="Portfolio Holdings & Asset Registry Manager")
     subparsers = parser.add_subparsers(dest="command")
 
-    # List
-    list_parser = subparsers.add_parser("list", help="List holdings for an entity")
-    list_parser.add_argument("--entity", required=True, help="Entity name (e.g., 'Ocean Embers')")
+    # List Holdings
+    list_p = subparsers.add_parser("list", help="List holdings for an entity")
+    list_p.add_argument("--entity", required=True, help="Entity name")
 
-    # Add
-    add_parser = subparsers.add_parser("add", help="Add a new investment parcel")
-    add_parser.add_argument("--entity", required=True, help="Entity name")
-    add_parser.add_argument("--asset", required=True, help="Asset ticker (e.g., BTC_COLD, VGS, MQG)")
-    add_parser.add_argument("--qty", type=float, required=True, help="Quantity purchased")
-    add_parser.add_argument("--cost", type=float, required=True, help="Total cost in AUD")
-    add_parser.add_argument("--date", required=True, help="Purchase date (YYYY-MM-DD)")
-    add_parser.add_argument("--expiry", help="Expiry date for Term Deposits (YYYY-MM-DD)")
+    # Add Parcel
+    add_p = subparsers.add_parser("add", help="Add a new investment parcel")
+    add_p.add_argument("--entity", required=True, help="Entity name")
+    add_p.add_argument("--asset", required=True, help="Asset ticker")
+    add_p.add_argument("--qty", type=float, required=True, help="Quantity")
+    add_p.add_argument("--cost", type=float, required=True, help="Total cost in AUD")
+    add_p.add_argument("--date", required=True, help="Purchase date (YYYY-MM-DD)")
+    add_p.add_argument("--expiry", help="Expiry date (YYYY-MM-DD)")
+
+    # Asset Registry Commands
+    asset_list_p = subparsers.add_parser("list-assets", help="List all registered assets")
+    
+    asset_add_p = subparsers.add_parser("add-asset", help="Register a new asset ticker")
+    asset_add_p.add_argument("--ticker", required=True)
+    asset_add_p.add_argument("--tier", required=True, help="CRYPTO, CORE, SAT, AGGR, or CASH")
+    asset_add_p.add_argument("--proxy", help="YFinance proxy (e.g., BTC-USD)")
+    asset_add_p.add_argument("--base", type=float, required=True, help="Base target weight (e.g., 0.15)")
+    asset_add_p.add_argument("--min", type=float, help="Min weight")
+    asset_add_p.add_argument("--max", type=float, help="Max weight")
+    asset_add_p.add_argument("--exit", type=float, help="Risk exit threshold")
+    asset_add_p.add_argument("--reduce", type=float, help="Risk reduce threshold")
+    asset_add_p.add_argument("--moon", type=float, help="Moonbag multiplier")
+    asset_add_p.add_argument("--yield_pa", type=float, default=0.0, help="Est yield (e.g., 0.05)")
+    asset_add_p.add_argument("--custody", help="Cold Storage, Broker, Platform, etc.")
 
     # Clear
-    clear_parser = subparsers.add_parser("clear", help="Clear all holdings for an entity")
-    clear_parser.add_argument("--entity", required=True, help="Entity name")
+    clear_p = subparsers.add_parser("clear", help="Clear all holdings for an entity")
+    clear_p.add_argument("--entity", required=True, help="Entity name")
 
     args = parser.parse_args()
 
@@ -82,6 +120,10 @@ if __name__ == "__main__":
         list_holdings(args.entity)
     elif args.command == "add":
         add_holding(args)
+    elif args.command == "list-assets":
+        list_assets()
+    elif args.command == "add-asset":
+        add_asset(args)
     elif args.command == "clear":
         clear_holdings(args.entity)
     else:

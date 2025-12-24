@@ -11,66 +11,10 @@ import portfolio_db
 portfolio_db.init_db()
 portfolio_db.seed_sample_data()
 
-# =========================================================
-# 1. LIVE DATA & YIELD RATES (AUD) - DEC 24, 2025
-# =========================================================
-
-# Prices and Yields based on Dec 2025 Market Snapshots
-DATA = {
-    # TICKER: [PRICE_AUD, EST_YIELD_PA, CUSTODY_TYPE]
-    "BTC_COLD":    [133142.0, 0.000, "Cold Storage"], 
-    "ETH_COLD":    [4611.0,   0.000, "Cold Storage"],
-    "ETH_STAKE":   [4611.0,   0.045, "Platform"],     # Staking approx 4.5%
-    "PAXG_NEXO":   [4330.0,   0.040, "Platform"],     # 4% yield
-    "ADA_MINSWAP": [0.85,     0.120, "DeFi"],         # Minswap 12%
-    "USD_LEDN":    [1.52,     0.070, "Platform"],     # Ledn USD 7%
-    "USD_NEXO":    [1.52,     0.100, "Platform"],     
-    "JUDO_TD":     [1.00,     0.050, "Bank"],         # Judo 5%
-    "MQG":         [203.01,   0.035, "Broker"],       
-    "VGS":         [154.03,   0.021, "Broker"],       
-    "VAS":         [109.15,   0.038, "Broker"],       
-    "VAP":         [101.51,   0.041, "Broker"]        
-}
-
-# Mapping for Risk Analysis Proxy Tickers
-RISK_PROXY_MAP = {
-    "BTC_COLD":    "BTC-USD",
-    "ETH_COLD":    "ETH-USD",
-    "ETH_STAKE":   "ETH-USD",
-    "PAXG_NEXO":   "GC=F",
-    "ADA_MINSWAP": "ADA-USD",
-    "MQG":         "MQG.AX",
-    "VGS":         "VGS.AX",
-    "VAS":         "VAS.AX",
-    "VAP":         "VAP.AX",
-    "USD_LEDN":    None,
-    "USD_NEXO":    None,
-    "JUDO_TD":     None
-}
-
-# =========================================================
-# 2. PORTFOLIO CONFIGURATION (Risk-Adaptive v2.0)
-# =========================================================
-
-ASSET_CONFIG = {
-    # TIER 1: CORE
-    "BTC_COLD":    {"tier": "CRYPTO", "base": 0.18, "min": 0.05, "max": 0.30, "exit": 0.85, "reduce": 0.75, "moon": 0.40, "custody": "Cold Storage"},
-    "ETH_COLD":    {"tier": "CRYPTO", "base": 0.10, "min": 0.02, "max": 0.20, "exit": 0.85, "reduce": 0.75, "moon": 0.40, "custody": "Cold Storage"},
-    "ETH_STAKE":   {"tier": "CRYPTO", "base": 0.05, "min": 0.02, "max": 0.15, "exit": 0.85, "reduce": 0.75, "moon": 0.40, "custody": "Platform"},
-    "VGS":         {"tier": "CORE",   "base": 0.15, "min": 0.05, "max": 0.25, "exit": 0.80, "reduce": 0.70, "moon": 0.20, "custody": "Broker"},
-    "MQG":         {"tier": "CORE",   "base": 0.10, "min": 0.05, "max": 0.20, "exit": 0.80, "reduce": 0.70, "moon": 0.20, "custody": "Broker"},
-    "PAXG_NEXO":   {"tier": "CORE",   "base": 0.08, "min": 0.02, "max": 0.15, "exit": 0.78, "reduce": 0.68, "moon": 0.25, "custody": "Platform"},
-
-    # TIER 2: SATELLITE
-    "VAS":         {"tier": "SAT",  "base": 0.06, "min": 0.00, "max": 0.12, "exit": 0.75, "reduce": 0.65, "moon": 0.25, "custody": "Broker"},
-    "VAP":         {"tier": "SAT",  "base": 0.04, "min": 0.00, "max": 0.10, "exit": 0.75, "reduce": 0.65, "moon": 0.25, "custody": "Broker"},
-    "ADA_MINSWAP": {"tier": "AGGR", "base": 0.05, "min": 0.00, "max": 0.10, "exit": 0.85, "reduce": 0.75, "moon": 0.40, "custody": "DeFi"},
-
-    # TIER 3: CASH
-    "USD_LEDN":    {"tier": "CASH", "base": 0.10, "custody": "Platform"}, 
-    "USD_NEXO":    {"tier": "CASH", "base": 0.07, "custody": "Platform"}, 
-    "JUDO_TD":     {"tier": "CASH", "base": 0.07, "custody": "Bank"},
-}
+# Asset definitions (Loaded dynamically in main)
+DATA = {}
+RISK_PROXY_MAP = {}
+ASSET_CONFIG = {}
 
 # --- ENTITY CONSTRAINTS ---
 ENTITY_RULES = {
@@ -291,6 +235,13 @@ if __name__ == "__main__":
     parser.add_argument("--injection", type=float, default=None, help="New cash injection amount")
     args = parser.parse_args()
 
+    # Dynamic Data Loading
+    print("Loading Institutional Asset Registry...")
+    db_data, db_proxies, db_config = portfolio_db.get_asset_defs()
+    DATA.update(db_data)
+    RISK_PROXY_MAP.update(db_proxies)
+    ASSET_CONFIG.update(db_config)
+    
     entity_name = args.entity
     entity_info = portfolio_db.get_entity_info(entity_name)
     
@@ -307,6 +258,27 @@ if __name__ == "__main__":
     parcels = portfolio_db.get_parcels(entity_name)
     risk_data = get_latest_risk_data(RISK_PROXY_MAP)
     
+    # Update DATA with latest live prices from risk_data fetch (if available)
+    import yfinance as yf
+    print("Updating registry with live market prices...")
+    for label, proxy in RISK_PROXY_MAP.items():
+        if proxy:
+            try:
+                # We can reuse the price from analyze_asset if we change it, 
+                # but for simplicity, let's just use the latest risk_data fetch 
+                # or a quick yf call if needed. Actually, let's fetch AUD prices.
+                ticker_yf = yf.Ticker(proxy)
+                current_price_usd = ticker_yf.fast_info['last_price']
+                
+                # Convert to AUD if it's a USD asset
+                if "USD" in proxy or proxy in ["GC=F", "BTC-USD", "ETH-USD", "ADA-USD"]:
+                    aud_usd = yf.Ticker("AUDUSD=X").fast_info['last_price']
+                    DATA[label][0] = current_price_usd / aud_usd
+                else:
+                    DATA[label][0] = current_price_usd
+            except Exception:
+                print(f"  Warning: Could not update live price for {label}. Using fallback.")
+
     df_exec, total_income = run_portfolio_optimizer(
         entity_name, entity_type, parcels, injection, risk_data
     )
