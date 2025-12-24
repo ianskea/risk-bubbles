@@ -1,426 +1,93 @@
-# 🚀 Quick Start Commands
+# 🚀 Institutional Risk Intelligence & Portfolio Management
 
-### 1. Market Intelligence (Institutional Report)
-Generates the main `institutional_analysis_report.txt` and deep-dive charts for your entire ticker list.
+A statistically validated, multi-entity portfolio management system with risk-adaptive rebalancing, performance tracking, and tax-aware planning.
+
+---
+
+## 🏛️ Core Components
+
+| Component | Purpose | Command |
+|-----------|---------|---------|
+| **Market Intelligence** | Risk analysis, AI insights & bubble detection | `./venv/bin/python3 enhanced_main.py` |
+| **Portfolio Planner** | Multi-entity rebalancing & action list | `./venv/bin/python3 investment_planner.py` |
+| **Asset Manager** | Manage holdings & asset registry | `./venv/bin/python3 manage_holdings.py` |
+| **Backtest Engine** | Stress test logic across historical cycles | `./venv/bin/python3 backtest_strategy.py` |
+
+---
+
+## 📅 Institutional Cadence (Routine)
+
+### 1. Weekly Intelligence (Market Awareness)
+**Command**: `./venv/bin/python3 enhanced_main.py`  
+Identify assets moving toward "Danger Zones" or "Value Zones." Review AI-generated risk reports.
+
+### 2. Monthly Execution (Capital Deployment)
+**Command**: `./venv/bin/python3 investment_planner.py --entity "Ocean Embers"`  
+Generate specific rebalance actions (BUY/SELL) for your monthly DCA and rebalancing.
+
+### 3. Maintenance (As Needed)
+**Command**: `./venv/bin/python3 manage_holdings.py list`  
+Update your local database when you perform buys/sells to keep tracking data accurate.
+
+---
+
+## 🔒 Privacy & Persistence (Local SQLite)
+
+All portfolio data is stored locally in `private/portfolio.sqlite`. This directory is **git-ignored** to ensure your holdings never leave your machine.
+
+### Multi-Entity Tracking
+The system supports distinct rules for different investment buckets:
+- **Aegirs Fire SuperFund**: Enforces strict AUD/ASX/Cold-Storage rules.
+- **Ocean Embers**: Full flexibility (Platforms/DeFi/International).
+
+### Performance & Tax Tracking
+- **Unrealized PnL**: Tracks price growth for every individual purchase parcel.
+- **CGT Bonus (12m)**: Automatically flags assets held for >365 days that qualify for the Aussie capital gains discount.
+- **Wealth Snapshots**: Automatically saves your total equity and profit history every time you run the planner.
+- **TD Maturity**: Countdown timer for Term Deposits with expiry alerts.
+
+---
+
+## ⚙️ Management CLI (`manage_holdings.py`)
+
+### Asset Registry (Add any Ticker)
+You can extend the system to any market in seconds without touching code:
 ```bash
-./venv/bin/python3 enhanced_main.py
+# Register a new asset (e.g. Gold)
+./venv/bin/python3 manage_holdings.py add-asset --ticker "GOLD" --tier "COMMODITY" --proxy "GC=F" --base 0.10
+
+# List valid registry assets
+./venv/bin/python3 manage_holdings.py list-assets
 ```
 
-### 2. Portfolio Strategy (Investment Planner)
-Generates high-conviction BUY/SELL actions, income estimates, and a 6-month DCA roadmap.
+### Loading Parcels
 ```bash
-./venv/bin/python3 investment_planner.py
-```
+# Register a buy action
+./venv/bin/python3 manage_holdings.py add --entity "Ocean Embers" --asset "BTC_COLD" --qty 0.5 --cost 62000 --date "2024-05-15"
 
-### 3. Strategy Audit (Backtest Engine)
-Stress tests the risk-adaptive logic across historical data to verify alpha and crash avoidance.
-```bash
-./venv/bin/python3 backtest_strategy.py
-```
-
-### 4. Advanced Portfolio Managers (Signals)
-- **v2.0 (Stable/Recommended)**: Asymmetric bands & momentum overrides.
-  ```bash
-  ./venv/bin/python3 adaptive_portfolio_v2.py
-  ```
-- **v3.0 (Experimental)**: Regime detection & conviction holds.
-  ```bash
-  ./venv/bin/python3 adaptive_portfolio_v3.py
-  ```
-
-### 5. Portfolio Management (Manage Holdings)
-Add, list, or clear your local (private) investment parcels.
-```bash
-./venv/bin/python3 manage_holdings.py --help
+# List current holdings
+./venv/bin/python3 manage_holdings.py list --entity "Ocean Embers"
 ```
 
 ---
 
-# 📅 Institutional Cadence (How to Use)
+## 🛡️ Risk-Adaptive v2.0 Logic
 
-To get the most out of this system, follow this structured routine:
-
-### 1. The Weekly Intelligence Check (Market Awareness)
-**Frequency**: Every Sunday/Monday  
-**Command**: `./venv/bin/python3 enhanced_main.py`  
-**Purpose**: Orientation. Identify which assets are moving toward "Danger Zones" or "Value Zones." Review the AI insights in `institutional_analysis_report.txt`.
-
-### 2. The Monthly Execution (Capital Deployment)
-**Frequency**: Once a month (Investment Day)  
-**Command**: `./venv/bin/python3 investment_planner.py`  
-**Purpose**: Action. Use this to deploy your monthly DCA and rebalance holdings. It provides a specific "Immediate Action Buy List" based on updated risk scores.
-
-### 3. The Quarterly Strategy Audit (Health Check)
-**Frequency**: Once every 3 months  
-**Command**: `./venv/bin/python3 backtest_strategy.py`  
-**Purpose**: Validation. Verify that the v2.0 logic is still maintaining its statistical edge and alpha over buy-and-hold in the current regime.
-
-### 4. Portfolio Maintenance (Data Hygiene)
-**Frequency**: Whenever you buy or sell assets  
-**Command**: `./venv/bin/python3 manage_holdings.py`  
-**Purpose**: Accuracy. Use this to update your local SQLite database with new purchase parcels so the planner can track cost-basis, PnL, and CGT status.
-
-### 4. The "Panic/Mania" Check (Ad-hoc)
-**Frequency**: When markets move +/- 15% in a week  
-**Command**: `./venv/bin/python3 enhanced_main.py`  
-**Purpose**: Protection. The **Momentum Override** will flag if a rally has become a statistically unsustainable "Blow-off Top."
+| Asset Class | Risk Redline | Action at Redline |
+|-------------|--------------|-------------------|
+| **Crypto** | **> 0.85** | 🔴 EXIT to Moonbag (20-40%) |
+| **Core Labels** | **> 0.80** | 🔴 REDUCE aggressively |
+| **Commodities**| **> 0.75** | 🔴 REBALANCE to base |
 
 ---
 
-# 🤖 Automation (Alerts & Reports)
+## 🤖 Automation
 
-You can schedule the Institutional Report to run automatically.
-
-### Option A: macOS Native Alerts (Recommended for Local Use)
-Triggers a desktop notification banner and automatically opens the report file.
+Schedule native macOS alerts to keep you updated on market risk:
 1. **Test it**: `./venv/bin/python3 macos_notifier.py`
-2. **Add to Crontab**: Run `crontab -e` and add:
-   ```bash
-   0 8 * * 1 /Users/ianskea/Sites/risk-bubbles/automated_report_cron.sh
-   ```
-
-### Option B: Email Reports (For Remote Use)
-1. **Setup SMTP Credentials** in `.env`:
-   ```env
-   SMTP_USER=your_email@gmail.com
-   SMTP_PASS=your_app_password
-   ```
-2. **Setup Crontab**: Update `automated_report_cron.sh` to call `send_report.py`.
+2. **Add to Crontab**: `0 8 * * 1 /Users/ianskea/Sites/risk-bubbles/automated_report_cron.sh`
 
 ---
 
-# Institutional-Grade Risk Bubble Intelligence System
-
-## Overview
-
-This is a **statistically validated, multi-factor risk analysis framework** designed to identify market bubbles and value opportunities using regression-based valuation combined with technical, momentum, volatility, and volume indicators.
-
-### Key Features
-
-✅ **v2.0 Asymmetric Logic**: Redlines calibrated by asset class (Crypto=0.85, Core=0.80, Satellite=0.75)  
-✅ **Momentum Override**: Automatically extends take-profit thresholds during parabolic rallies  
-✅ **Multi-Model Ensemble**: Combines linear, quadratic, and adaptive weighted regression  
-✅ **Institutional-Grade Planning**: Integrated position sizing based on risk-adjusted weights  
-
----
-
-## System Architecture
-
-```
-investment_planner.py         → High-conviction portfolio planning & action list
-enhanced_main.py              → Institutional reporting and AI interpretation
-backtest_strategy.py          → Historical stress-testing and alpha audit
-enhanced_risk_analyzer.py     → Core analysis engine with multi-factor scoring
-```
-
----
-
-## Installation
-
-```bash
-# Clone or download the project
-cd risk-bubble-intelligence
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set up API keys (optional, for AI analysis)
-cp .env.example .env
-# Edit .env and add your DEEPSEEK_API_KEY
-```
-
----
-
-## Understanding the v2.0 Risk Redlines
-
-### Asymmetric Exit Thresholds
-Different assets hit "bubble territory" at different statistical deviations.
-
-| Asset Class | Danger Zone | Action (Redline Reached) |
-|------------|-------------|-------------------------|
-| **Crypto (BTC, ETH)** | **> 0.85** | 🔴 EXIT Position (Recycle to Cash) |
-| **Core (VGS, MQG)** | **> 0.80** | 🔴 EXIT Position (Recycle to Cash) |
-| **Satellite (Miners, Commodities)** | **> 0.75** | 🔴 EXIT Position (Recycle to Cash) |
-
-### Universal Accumulation Tiers (0.0 - 0.70)
-| Score Range | Signal | Interpretation | Action |
-|------------|--------|----------------|--------|
-| **0.00 - 0.30** | 🟢 OVERWEIGHT | Extreme statistical value | Aggressive Buy (1.5x Base) |
-| **0.30 - 0.50** | 🟢 ACCUMULATE | Below fair value | Standard DCA / Standard Weight |
-| **0.50 - 0.65** | 🟡 HOLD | Fair value range | Hold existing / Moderate caution |
-| **0.65 - Redline** | � MOONBAG | Overextended / Warning | Reduce to 20-40% "Moonbag" |
-
-### How Risk is Calculated
-
-The **Composite Risk Score** is a weighted average of four independent factors:
-
-1. **Valuation Risk (40%)**: Ensemble of 3 regression models (linear, quadratic, adaptive) measuring how far price deviates from predicted fair value
-2. **Momentum Risk (25%)**: Combines RSI, Stochastic Oscillator, and MACD to detect overbought/oversold conditions
-3. **Volatility Risk (20%)**: ATR and Bollinger Band width normalized to detect abnormal market conditions
-4. **Volume Risk (15%)**: Volume divergence analysis to identify distribution/accumulation patterns
-
----
-
-## Validation Metrics Explained
-
-### 1. Regression Accuracy
-- **R² Score**: How well the regression model fits the data (>0.80 is excellent)
-- **Directional Accuracy**: % of time model correctly predicts up/down moves (>60% is good)
-- **MAPE**: Mean Absolute Percentage Error in price predictions
-
-### 2. Predictive Power
-- **Risk-Return Correlation**: Tests if high risk scores actually predict poor future returns (should be negative)
-- **Forward Return Analysis**: Compares returns after BUY signals vs SELL signals
-- **Statistical Significance**: P-values confirm the relationship isn't random
-
-### 3. Signal Timing Quality
-- **Buy Timing Accuracy**: % of BUY signals near local price bottoms
-- **Sell Timing Accuracy**: % of SELL signals near local price tops
-- **Price Percentile Analysis**: Average historical price percentile at signal generation
-
-### 4. Calibration
-- **Calibration Correlation**: Risk score of 0.8 should mean price is in 80th percentile historically
-- **Calibration Error**: Mean absolute difference between predicted and actual percentiles (<0.15 is good)
-
-### 5. Walk-Forward Validation
-- **Out-of-Sample Testing**: Trains on past data, tests on unseen future data
-- **Consistency**: % of test periods where strategy outperforms buy-and-hold
-- **Avg Outperformance**: Average excess return vs passive holding
-
----
-
-## Interpreting Validation Results
-
-### Overall Validation Score Guide
-
-| Score | Grade | Interpretation |
-|-------|-------|----------------|
-| **75-100** | A | Excellent - Model is robust and reliable |
-| **60-74** | B | Good - Model is dependable with acceptable accuracy |
-| **50-59** | C | Fair - Model works but has room for improvement |
-| **<50** | D | Poor - Model needs significant refinement |
-
-### What to Look For:
-
-✅ **Strong Negative Correlation** between risk scores and forward returns  
-✅ **High Directional Accuracy** (>55% is valuable, >60% is excellent)  
-✅ **Consistent Walk-Forward Results** (>60% profitable periods)  
-✅ **Low Calibration Error** (<0.15)  
-✅ **Signal Timing Near Extremes** (>30% for both buy and sell)
-
----
-
-## Output Files
-
-### Generated Reports
-
-```
-output/
-├── institutional_analysis_report.txt    # Main analysis report with all assets
-├── validation/
-│   ├── BTC-USD_validation_report.txt   # Detailed validation for each asset
-│   ├── BTC-USD_validation_data.json    # Machine-readable validation metrics
-│   └── validation_suite_summary.txt    # Cross-asset validation summary
-└── [TICKER]_comprehensive_analysis.png  # 6-panel visualization chart
-```
-
-### Chart Panels
-
-1. **Price with Regression Bands** (log scale) - Shows fair value and ±2σ bands
-2. **Composite Risk Score** - Main risk metric with buy/sell zones highlighted
-3. **Risk Factor Breakdown** - Individual component contributions
-4. **RSI (14)** - Momentum indicator with overbought/oversold zones
-5. **MACD** - Trend following indicator with histogram
-6. **Volume Analysis** - Volume bars with moving average
-
----
-
-## Advanced Usage
-
-### Custom Ticker Lists
-
-Edit `enhanced_main.py`:
-
-```python
-TICKERS = {
-    "Your Asset": "TICKER.SYMBOL",
-    # Add your custom tickers
-}
-```
-
-### Adjusting Risk Thresholds
-
-Edit `run_validated_analysis.py` or `enhanced_risk_analyzer.py`:
-
-```python
-# Current defaults
-THRESHOLD_BUY = 0.30
-THRESHOLD_SELL = 0.75
-
-# For more aggressive signals
-THRESHOLD_BUY = 0.35
-THRESHOLD_SELL = 0.70
-```
-
-### Backtesting Custom Strategies
-
-```python
-from enhanced_risk_analyzer import analyze_asset, backtest_signals
-
-df, _, _ = analyze_asset("BTC-USD")
-
-# Test different thresholds
-results = backtest_signals(df, risk_threshold_buy=0.25, risk_threshold_sell=0.80)
-print(f"Outperformance: {results['outperformance']:.1f}%")
-```
-
----
-
-## API Integration (Optional)
-
-The system supports AI-powered analysis via DeepSeek API:
-
-```bash
-# In .env file
-DEEPSEEK_API_KEY=your_key_here
-```
-
-If no API key is provided, the system automatically falls back to rule-based analysis.
-
----
-
-## Best Practices
-
-### For Long-Term Investors (DCA Strategy)
-
-1. Run weekly analysis on your portfolio
-2. Focus on **composite risk score** for entry/exit decisions
-3. Buy when risk < 0.40, scale in more aggressively when < 0.30
-4. Take profits when risk > 0.70, exit completely when > 0.80
-5. Always check **validation scores** - only trust signals from well-validated models
-
-### For Traders
-
-1. Use **momentum risk** factor for short-term positioning
-2. Watch for **regime changes** (-1 to +1) in market structure
-3. Pay attention to **volume risk** spikes (can signal reversals)
-4. Combine with your own technical analysis for confirmation
-
-### For Analysts
-
-1. Run **validation suite** monthly to ensure model stays calibrated
-2. Compare **walk-forward results** across different asset classes
-3. Monitor **calibration error** - if it increases, model may need retraining
-4. Use **backtest metrics** to communicate strategy performance to stakeholders
-
----
-
-## Performance Benchmarks
-
-Based on validation suite testing (as of December 2024):
-
-| Asset Class | Avg Validation Score | Typical Outperformance | Win Rate |
-|------------|---------------------|----------------------|----------|
-| Cryptocurrency | 65-75 | +15-25% | 55-65% |
-| Commodities | 60-70 | +8-15% | 52-60% |
-| Equities (Large Cap) | 70-80 | +5-12% | 58-65% |
-| Equities (Mining) | 65-75 | +10-18% | 54-62% |
-| ETFs | 68-78 | +6-14% | 56-63% |
-
-**Note**: Past performance does not guarantee future results. Always validate on your specific assets.
-
----
-
-## Troubleshooting
-
-### "No data found for ticker"
-- Check ticker symbol format (e.g., BTC-USD, AAPL, BHP.AX)
-- Verify yfinance has data for that symbol
-- Try reducing `period` if max history isn't available
-
-### "Insufficient data for validation"
-- Need at least 200 days for basic analysis
-- 500+ days recommended for robust validation
-- Some validation tests require 2+ years of history
-
-### "Model validation score is low"
-- Asset may be too volatile or have regime changes
-- Try adjusting regression window size
-- Consider if asset is appropriate for this methodology
-- Check if there's enough historical data
-
-### "Risk scores seem off"
-- Run `validate_risk_calibration()` to check accuracy
-- Model may need warmup period (first 200 days unreliable)
-- Consider running validation suite to compare across assets
-
----
-
-## Technical Notes
-
-### Why Ensemble Regression?
-
-- **Linear**: Captures long-term secular trends
-- **Quadratic**: Models diminishing returns / acceleration
-- **Adaptive**: Gives more weight to recent price action
-
-All three models vote, with adaptive weighted highest (50%) for responsiveness.
-
-### Why These Specific Factors?
-
-Based on academic research and institutional quant strategies:
-
-- **Valuation**: Mean reversion is the strongest force in markets over time
-- **Momentum**: Trends persist, but overextension predicts reversals
-- **Volatility**: Abnormal volatility spikes precede major moves
-- **Volume**: Smart money leaves footprints in volume patterns
-
-### Mathematical Foundation
-
-Risk score uses **Z-score normalization** + **Normal CDF**:
-
-```
-z = (current_residual - 0) / historical_std_dev
-risk = Φ(z)  # Where Φ is the cumulative distribution function
-```
-
-This transforms deviations into probabilities: risk of 0.84 means current price is 1 standard deviation above fair value (84th percentile).
-
----
-
-## Contributing
-
-This is a research framework. Improvements welcome:
-
-- Add new risk factors (sentiment, on-chain metrics, etc.)
-- Improve calibration algorithms
-- Add machine learning models
-- Enhance visualization
-
----
-
-## Disclaimer
-
-**This software is for educational and research purposes only.**
-
-- Not financial advice
-- Past performance ≠ future results
-- Always do your own research
-- Never invest more than you can afford to lose
-- Validate the model on your specific assets before trading
-
-The validation framework helps you understand model reliability, but no model is perfect. Use this as ONE input in your decision-making process.
-
----
-
-## License
-
-MIT License - Use freely with attribution
-
----
-
-## Questions?
-
-For issues, enhancements, or questions about the methodology, please open an issue or contact the maintainer.
-
-**Built for investors who demand statistical rigor behind their risk intelligence.**
+## ⚖️ Disclaimer
+**Educational/Research purposes only.** Not financial advice. Past performance ≠ future results. Use the verification suite (`qa_backtest_suite.py`) to audit all logic before deployment.
