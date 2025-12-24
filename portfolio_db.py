@@ -8,6 +8,7 @@ def init_db():
     """Initializes the database and seeds initial entities if empty."""
     os.makedirs("private", exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
 
     # Entities Table (Hardened with CHECK constraint for specific names)
@@ -77,6 +78,7 @@ def init_db():
 
 def add_asset(ticker, tier, proxy, base_w, min_w=None, max_w=None, exit_t=None, reduce_t=None, moon_b=None, yield_pa=0, custody=None):
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
     cursor.execute("""
         INSERT OR REPLACE INTO assets 
@@ -89,6 +91,7 @@ def add_asset(ticker, tier, proxy, base_w, min_w=None, max_w=None, exit_t=None, 
 def get_asset_defs():
     """Returns a format compatible with investment_planner.py's DATA, RISK_PROXY_MAP, and ASSET_CONFIG."""
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM assets")
     rows = cursor.fetchall()

@@ -69,14 +69,18 @@ def calculate_dynamic_weight(asset, cfg, stats):
     tier = cfg.get("tier", "CASH")
     base = cfg.get("base", 0.0)
     if tier == "CASH": return base
-    min_w = cfg.get("min", 0.0)
-    max_w = cfg.get("max", base)
-    exit_t = cfg.get("exit", 0.75)
-    reduce_t = cfg.get("reduce", 0.65)
-    moonbag = cfg.get("moon", 0.20)
+
+    # Fallbacks for optional registry fields
+    min_w = cfg.get("min") if cfg.get("min") is not None else 0.0
+    max_w = cfg.get("max") if cfg.get("max") is not None else base
+    exit_t = cfg.get("exit") if cfg.get("exit") is not None else 0.75
+    reduce_t = cfg.get("reduce") if cfg.get("reduce") is not None else 0.65
+    moonbag = cfg.get("moon") if cfg.get("moon") is not None else 0.20
+
     if MOMENTUM_OVERRIDE["enabled"] and momentum > MOMENTUM_OVERRIDE["threshold"]:
         exit_t += MOMENTUM_OVERRIDE["risk_extension"]
         reduce_t += MOMENTUM_OVERRIDE["risk_extension"]
+
     if risk > exit_t: return min_w
     if risk > reduce_t: return max(min_w, base * moonbag)
     if risk < 0.30:
@@ -198,7 +202,7 @@ def run_portfolio_optimizer(entity_name, entity_type, parcels, injection, risk_d
         
         yield_pa = DATA[asset][1]
         cfg = active_config.get(asset, {})
-        reduce_t = cfg.get("reduce", 0.65)
+        reduce_t = cfg.get("reduce") if cfg.get("reduce") is not None else 0.65
 
         status = "HOLD"
         if risk is None: status = "❌ ERROR"

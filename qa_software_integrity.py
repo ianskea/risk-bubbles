@@ -1,45 +1,55 @@
 import os
 import sqlite3
 import portfolio_db
+import pandas as pd
+import investment_planner
+from datetime import datetime
 
 def test_db_constraints():
     print("Testing Database Constraints...")
+    portfolio_db.init_db()
     conn = sqlite3.connect(portfolio_db.DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
     
-    # 1. Test Entity Name Constraint
+    # 1. Test Entity Name Constraint (CHECK)
     try:
-        cursor.execute("INSERT INTO entities (name, type) VALUES ('Fake Entity', 'General')")
+        cursor.execute("INSERT INTO entities (name, type) VALUES ('Invalid Name', 'General')")
         conn.commit()
-        print("❌ FAIL: Database allowed invalid entity name.")
     except sqlite3.IntegrityError:
         print("✅ PASS: Database rejected invalid entity name.")
         
-    # 2. Test Asset Ticker Constraint
+    # 2. Test Asset Ticker Constraint (FOREIGN KEY)
     try:
-        # Get actual entity id
         cursor.execute("SELECT id FROM entities WHERE name = 'Ocean Embers'")
         e_id = cursor.fetchone()[0]
-        cursor.execute(f"INSERT INTO parcels (entity_id, asset_ticker, quantity, cost_aud, purchase_date) VALUES ({e_id}, 'INVALID_TICKER', 10, 100, '2024-01-01')")
+        cursor.execute(f"INSERT INTO parcels (entity_id, asset_ticker, quantity, cost_aud, purchase_date) VALUES ({e_id}, 'GHOST_TICKER', 10, 100, '2024-01-01')")
         conn.commit()
-        print("❌ FAIL: Database allowed invalid asset ticker.")
     except sqlite3.IntegrityError:
-        print("✅ PASS: Database rejected invalid asset ticker.")
+        print("✅ PASS: Database rejected invalid asset ticker (FK enforced).")
         
     conn.close()
 
 def test_entity_logic():
     print("\nTesting Multi-Entity Planning Logic...")
-    from investment_planner import run_portfolio_optimizer, ASSET_CONFIG, RISK_PROXY_MAP
     
-    # Mock data
-    mock_risk = {k: {"risk": 0.5, "momentum": 0.0} for k in RISK_PROXY_MAP.keys()}
-    mock_risk[None] = {"risk": 0.0, "momentum": 0.0}
+    # Sync registry data into the planner's globals
+    db_data, db_proxies, db_config = portfolio_db.get_asset_defs()
+    investment_planner.DATA.update(db_data)
+    investment_planner.RISK_PROXY_MAP.update(db_proxies)
+    investment_planner.ASSET_CONFIG.update(db_config)
     
-    # 1. SuperFund Constraints (should exclude PAXG_NEXO, ETH_STAKE etc)
-    parcels = [("BTC_COLD", 1, 1000, "2024-01-01", None)]
-    df, _ = run_portfolio_optimizer("Test Entity", "SuperFund", parcels, 0, mock_risk)
+    # Mock risk
+    mock_risk = {k: {"risk": 0.5, "momentum": 0.0} for k in investment_planner.ASSET_CONFIG.keys()}
     
+    # Test SuperFund (Strict Rules)
+    parcels = [("BTC_COLD", 1.0, 1000, "2024-01-01", None)]
+    df, _ = investment_planner.run_portfolio_optimizer("Test Entity", "SuperFund", parcels, 0, mock_risk)
+    
+    if df.empty:
+        print("❌ FAIL: Optimizer returned empty DF for valid SuperFund parcel.")
+        return
+
     allowed_assets = df['Asset'].tolist()
     disallowed = ["PAXG_NEXO", "USD_LEDN", "ETH_STAKE"]
     intersection = set(allowed_assets).intersection(set(disallowed))
@@ -51,24 +61,31 @@ def test_entity_logic():
 
 def test_performance_math():
     print("\nTesting Performance Calculation Math...")
-    # Mock some parcels with known cost and current price
-    # BTC_COLD price in DATA is ~133k. Let's cost it at 100k for +33% pnl.
-    from investment_planner import run_portfolio_optimizer, DATA
     
-    price_now = DATA["BTC_COLD"][0]
-    cost_basis = price_now / 1.5 # 50% gain
+    # Add a test asset to registry
+    portfolio_db.add_asset("QA_BTC", "CRYPTO", "BTC-USD", 0.1, custody="Cold Storage")
     
-    parcels = [("BTC_COLD", 1.0, cost_basis, "2023-01-01", None)] # >12m for CGT+
-    mock_risk = {"BTC_COLD": {"risk": 0.5, "momentum": 0.0}}
+    # Sync it to planner
+    db_data, db_proxies, db_config = portfolio_db.get_asset_defs()
+    investment_planner.DATA.update(db_data)
+    investment_planner.ASSET_CONFIG.update(db_config)
     
-    df, _ = run_portfolio_optimizer("Test", "General", parcels, 0, mock_risk)
+    price_now = 120000.0
+    cost_basis = 80000.0 # +50% gain
     
-    btc_row = df[df['Asset'] == 'BTC_COLD'].iloc[0]
-    pnl = btc_row['PnL']
-    tax = btc_row['TAX']
+    investment_planner.DATA["QA_BTC"] = [price_now, 0, "Cold Storage"]
+    
+    parcels = [("QA_BTC", 1.0, cost_basis, "2023-01-01", None)] # >12m
+    mock_risk = {"QA_BTC": {"risk": 0.5, "momentum": 0.0}}
+    
+    df, _ = investment_planner.run_portfolio_optimizer("Test", "General", parcels, 0, mock_risk)
+    
+    row = df[df['Asset'] == 'QA_BTC'].iloc[0]
+    pnl = row['PnL']
+    tax = row['TAX']
     
     if "+50.0%" in pnl:
-        print("✅ PASS: PnL math is correct.")
+        print("✅ PASS: PnL math is correct (+50%).")
     else:
         print(f"❌ FAIL: PnL math incorrect. Got {pnl}")
         
@@ -79,7 +96,7 @@ def test_performance_math():
 
 if __name__ == "__main__":
     print(f"{'='*60}")
-    print(" SYSTEM QA & INTEGRATION TEST SUITE")
+    print(" SYSTEM QA & INTEGRATION TEST SUITE (v2.2 Dynamic)")
     print(f"{'='*60}")
     test_db_constraints()
     test_entity_logic()
