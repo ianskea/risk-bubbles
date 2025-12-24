@@ -10,21 +10,23 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Entities Table
+    # Entities Table (Hardened with CHECK constraint for specific names)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS entities (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL,
+            name TEXT UNIQUE NOT NULL CHECK (name IN ('Aegirs Fire SuperFund', 'Ocean Embers')),
             type TEXT NOT NULL CHECK (type IN ('SuperFund', 'General'))
         )
     ''')
 
-    # Parcels Table (Cost Basis Tracking)
-    cursor.execute('''
+    # Parcels Table (Hardened with CHECK constraint for supported tickers)
+    # Note: We pull the allowed tickers from the primary DATA keys in the app
+    allowed_tickers = "('BTC_COLD', 'ETH_COLD', 'ETH_STAKE', 'PAXG_NEXO', 'ADA_MINSWAP', 'USD_LEDN', 'USD_NEXO', 'JUDO_TD', 'MQG', 'VGS', 'VAS', 'VAP')"
+    cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS parcels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             entity_id INTEGER NOT NULL,
-            asset_ticker TEXT NOT NULL,
+            asset_ticker TEXT NOT NULL CHECK (asset_ticker IN {allowed_tickers}),
             quantity REAL NOT NULL,
             cost_aud REAL NOT NULL,
             purchase_date DATE NOT NULL,
