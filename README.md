@@ -1,23 +1,82 @@
-# QUICK START
+# 🚀 Quick Start Commands
 
-bash# First time setup
-pip install -r requirements.txt
+### 1. Market Intelligence (Institutional Report)
+Generates the main `institutional_analysis_report.txt` and deep-dive charts for your entire ticker list.
+```bash
+./venv/bin/python3 enhanced_main.py
+```
 
-# venv setup
-source venv/bin/activate
+### 2. Portfolio Strategy (Investment Planner)
+Generates high-conviction BUY/SELL actions, income estimates, and a 6-month DCA roadmap.
+```bash
+./venv/bin/python3 investment_planner.py
+```
 
-# Quick single-asset check (2 min)
-python run_validated_analysis.py  # choose option 3
+### 3. Strategy Audit (Backtest Engine)
+Stress tests the risk-adaptive logic across historical data to verify alpha and crash avoidance.
+```bash
+./venv/bin/python3 backtest_strategy.py
+```
 
-# Full validation suite (15 min)
-python run_validated_analysis.py  # choose option 1
+### 4. Advanced Portfolio Managers (Signals)
+- **v2.0 (Stable/Recommended)**: Asymmetric bands & momentum overrides.
+  ```bash
+  ./venv/bin/python3 adaptive_portfolio_v2.py
+  ```
+- **v3.0 (Experimental)**: Regime detection & conviction holds.
+  ```bash
+  ./venv/bin/python3 adaptive_portfolio_v3.py
+  ```
 
-# Full analysis/reporting (20 min)
-python enhanced_main.py
+---
 
-# Legacy baseline
-python main.py
+# 📅 Institutional Cadence (How to Use)
 
+To get the most out of this system, follow this structured routine:
+
+### 1. The Weekly Intelligence Check (Market Awareness)
+**Frequency**: Every Sunday/Monday  
+**Command**: `./venv/bin/python3 enhanced_main.py`  
+**Purpose**: Orientation. Identify which assets are moving toward "Danger Zones" or "Value Zones." Review the AI insights in `institutional_analysis_report.txt`.
+
+### 2. The Monthly Execution (Capital Deployment)
+**Frequency**: Once a month (Investment Day)  
+**Command**: `./venv/bin/python3 investment_planner.py`  
+**Purpose**: Action. Use this to deploy your monthly DCA and rebalance holdings. It provides a specific "Immediate Action Buy List" based on updated risk scores.
+
+### 3. The Quarterly Strategy Audit (Health Check)
+**Frequency**: Once every 3 months  
+**Command**: `./venv/bin/python3 backtest_strategy.py`  
+**Purpose**: Validation. Verify that the v2.0 logic is still maintaining its statistical edge and alpha over buy-and-hold in the current regime.
+
+### 4. The "Panic/Mania" Check (Ad-hoc)
+**Frequency**: When markets move +/- 15% in a week  
+**Command**: `./venv/bin/python3 enhanced_main.py`  
+**Purpose**: Protection. The **Momentum Override** will flag if a rally has become a statistically unsustainable "Blow-off Top."
+
+---
+
+# 🤖 Automation (Alerts & Reports)
+
+You can schedule the Institutional Report to run automatically.
+
+### Option A: macOS Native Alerts (Recommended for Local Use)
+Triggers a desktop notification banner and automatically opens the report file.
+1. **Test it**: `./venv/bin/python3 macos_notifier.py`
+2. **Add to Crontab**: Run `crontab -e` and add:
+   ```bash
+   0 8 * * 1 /Users/ianskea/Sites/risk-bubbles/automated_report_cron.sh
+   ```
+
+### Option B: Email Reports (For Remote Use)
+1. **Setup SMTP Credentials** in `.env`:
+   ```env
+   SMTP_USER=your_email@gmail.com
+   SMTP_PASS=your_app_password
+   ```
+2. **Setup Crontab**: Update `automated_report_cron.sh` to call `send_report.py`.
+
+---
 
 # Institutional-Grade Risk Bubble Intelligence System
 
@@ -27,22 +86,20 @@ This is a **statistically validated, multi-factor risk analysis framework** desi
 
 ### Key Features
 
+✅ **v2.0 Asymmetric Logic**: Redlines calibrated by asset class (Crypto=0.85, Core=0.80, Satellite=0.75)  
+✅ **Momentum Override**: Automatically extends take-profit thresholds during parabolic rallies  
 ✅ **Multi-Model Ensemble**: Combines linear, quadratic, and adaptive weighted regression  
-✅ **4-Factor Risk Score**: Valuation (40%) + Momentum (25%) + Volatility (20%) + Volume (15%)  
-✅ **Comprehensive Validation**: Statistical tests prove model accuracy and predictive power  
-✅ **Backtested Signals**: Every recommendation is validated against historical performance  
-✅ **Institutional-Grade Reporting**: Detailed analysis with Sharpe ratios, max drawdown, win rates  
-✅ **AI-Enhanced Analysis**: Optional DeepSeek API integration for intelligent interpretation
+✅ **Institutional-Grade Planning**: Integrated position sizing based on risk-adjusted weights  
 
 ---
 
 ## System Architecture
 
 ```
+investment_planner.py         → High-conviction portfolio planning & action list
+enhanced_main.py              → Institutional reporting and AI interpretation
+backtest_strategy.py          → Historical stress-testing and alpha audit
 enhanced_risk_analyzer.py     → Core analysis engine with multi-factor scoring
-model_validation.py           → Statistical validation framework
-enhanced_main.py              → Comprehensive reporting and visualization
-run_validated_analysis.py     → Master runner with validation suite
 ```
 
 ---
@@ -63,53 +120,24 @@ cp .env.example .env
 
 ---
 
-## Quick Start
+## Understanding the v2.0 Risk Redlines
 
-### Option 1: Quick Check (Single Asset)
+### Asymmetric Exit Thresholds
+Different assets hit "bubble territory" at different statistical deviations.
 
-```python
-python run_validated_analysis.py
-# Select option 3, enter ticker (e.g., BTC-USD)
-```
+| Asset Class | Danger Zone | Action (Redline Reached) |
+|------------|-------------|-------------------------|
+| **Crypto (BTC, ETH)** | **> 0.85** | 🔴 EXIT Position (Recycle to Cash) |
+| **Core (VGS, MQG)** | **> 0.80** | 🔴 EXIT Position (Recycle to Cash) |
+| **Satellite (Miners, Commodities)** | **> 0.75** | 🔴 EXIT Position (Recycle to Cash) |
 
-### Option 2: Single Asset with Full Validation
-
-```python
-from run_validated_analysis import run_validated_analysis
-
-result = run_validated_analysis("Bitcoin", "BTC-USD")
-print(result['validation']['report'])
-```
-
-### Option 3: Full Validation Suite (Recommended First Run)
-
-```python
-python run_validated_analysis.py
-# Select option 1
-# Analyzes 5 diverse assets and validates model robustness
-```
-
-### Option 4: Batch Analysis (Your Full Portfolio)
-
-```python
-python enhanced_main.py
-# Analyzes all tickers in TICKERS dictionary
-# Generates comprehensive reports and charts
-```
-
----
-
-## Understanding the Risk Score
-
-### Risk Score Scale (0.0 - 1.0)
-
+### Universal Accumulation Tiers (0.0 - 0.70)
 | Score Range | Signal | Interpretation | Action |
 |------------|--------|----------------|--------|
-| **0.00 - 0.30** | 🟢 STRONG BUY | Extreme statistical value, price well below fair value trend | Aggressive DCA, 2-3x position size |
-| **0.30 - 0.40** | 🟢 BUY | Below fair value, good accumulation zone | Standard DCA, normal position size |
-| **0.40 - 0.60** | 🟡 HOLD | Near fair value, balanced risk/reward | Maintain positions, light DCA |
-| **0.60 - 0.75** | 🟡 REDUCE | Above fair value, elevated risk | Take partial profits (25-50%) |
-| **0.75 - 1.00** | 🔴 SELL | Bubble territory, extreme overvaluation | Exit positions, high probability of mean reversion |
+| **0.00 - 0.30** | 🟢 OVERWEIGHT | Extreme statistical value | Aggressive Buy (1.5x Base) |
+| **0.30 - 0.50** | 🟢 ACCUMULATE | Below fair value | Standard DCA / Standard Weight |
+| **0.50 - 0.65** | 🟡 HOLD | Fair value range | Hold existing / Moderate caution |
+| **0.65 - Redline** | � MOONBAG | Overextended / Warning | Reduce to 20-40% "Moonbag" |
 
 ### How Risk is Calculated
 

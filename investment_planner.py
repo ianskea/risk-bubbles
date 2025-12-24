@@ -14,32 +14,34 @@ MONTHLY_DCA = 3000.00
 # Prices and Yields based on Dec 2025 Market Snapshots
 DATA = {
     # TICKER: [PRICE_AUD, EST_YIELD_PA, CUSTODY_TYPE]
-    "BTC_COLD":   [133142.0, 0.000, "Cold Storage"], 
-    "BTC_LEDN":   [133142.0, 0.070, "Platform"],     
-    "ETH_STAKE":  [4611.0,   0.065, "Platform"],     
-    "USD_NEXO":   [1.51,     0.100, "Platform"],     
-    "PAXG_NEXO":  [4330.0,   0.045, "Platform"],     
-    "JUDO_TD":    [1.00,     0.045, "Bank"],         
-    "ADA_BEEFY":  [0.85,     0.120, "DeFi"],         
-    "MQG":        [203.01,   0.035, "Broker"],       
-    "VGS":        [154.03,   0.021, "Broker"],       
-    "VAS":        [109.15,   0.038, "Broker"],       
-    "VAP":        [101.51,   0.041, "Broker"]        
+    "BTC_COLD":    [133142.0, 0.000, "Cold Storage"], 
+    "ETH_COLD":    [4611.0,   0.000, "Cold Storage"],
+    "ETH_STAKE":   [4611.0,   0.045, "Platform"],     # Staking approx 4.5%
+    "PAXG_NEXO":   [4330.0,   0.040, "Platform"],     # 4% yield
+    "ADA_MINSWAP": [0.85,     0.120, "DeFi"],         # Minswap 12%
+    "USD_LEDN":    [1.52,     0.070, "Platform"],     # Ledn USD 7%
+    "USD_NEXO":    [1.52,     0.100, "Platform"],     
+    "JUDO_TD":     [1.00,     0.050, "Bank"],         # Judo 5%
+    "MQG":         [203.01,   0.035, "Broker"],       
+    "VGS":         [154.03,   0.021, "Broker"],       
+    "VAS":         [109.15,   0.038, "Broker"],       
+    "VAP":         [101.51,   0.041, "Broker"]        
 }
 
 # Mapping for Risk Analysis Proxy Tickers
 RISK_PROXY_MAP = {
-    "BTC_COLD": "BTC-USD",
-    "BTC_LEDN": "BTC-USD",
-    "ETH_STAKE": "ETH-USD",
-    "PAXG_NEXO": "GC=F",
-    "ADA_BEEFY": "ADA-USD",
-    "MQG": "MQG.AX",
-    "VGS": "VGS.AX",
-    "VAS": "VAS.AX",
-    "VAP": "VAP.AX",
-    "USD_NEXO": None, # Stable/Cash
-    "JUDO_TD": None   # Bank/Cash
+    "BTC_COLD":    "BTC-USD",
+    "ETH_COLD":    "ETH-USD",
+    "ETH_STAKE":   "ETH-USD",
+    "PAXG_NEXO":   "GC=F",
+    "ADA_MINSWAP": "ADA-USD",
+    "MQG":         "MQG.AX",
+    "VGS":         "VGS.AX",
+    "VAS":         "VAS.AX",
+    "VAP":         "VAP.AX",
+    "USD_LEDN":    None,
+    "USD_NEXO":    None,
+    "JUDO_TD":     None
 }
 
 # =========================================================
@@ -50,21 +52,22 @@ RISK_PROXY_MAP = {
 
 ASSET_CONFIG = {
     # TIER 1: CORE (Higher tolerance)
-    "BTC_COLD":  {"tier": "CRYPTO", "base": 0.08, "min": 0.02, "max": 0.12, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
-    "BTC_LEDN":  {"tier": "CRYPTO", "base": 0.08, "min": 0.02, "max": 0.12, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
-    "ETH_STAKE": {"tier": "CRYPTO", "base": 0.16, "min": 0.05, "max": 0.20, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
-    "VGS":       {"tier": "CORE",   "base": 0.10, "min": 0.05, "max": 0.15, "exit": 0.80, "reduce": 0.70, "moon": 0.20},
-    "MQG":       {"tier": "CORE",   "base": 0.10, "min": 0.05, "max": 0.15, "exit": 0.80, "reduce": 0.70, "moon": 0.20},
-    "PAXG_NEXO": {"tier": "CORE",   "base": 0.12, "min": 0.05, "max": 0.15, "exit": 0.78, "reduce": 0.68, "moon": 0.25},
+    "BTC_COLD":    {"tier": "CRYPTO", "base": 0.12, "min": 0.02, "max": 0.20, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
+    "ETH_COLD":    {"tier": "CRYPTO", "base": 0.08, "min": 0.02, "max": 0.12, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
+    "ETH_STAKE":   {"tier": "CRYPTO", "base": 0.08, "min": 0.02, "max": 0.12, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
+    "VGS":         {"tier": "CORE",   "base": 0.12, "min": 0.05, "max": 0.18, "exit": 0.80, "reduce": 0.70, "moon": 0.20},
+    "MQG":         {"tier": "CORE",   "base": 0.10, "min": 0.05, "max": 0.15, "exit": 0.80, "reduce": 0.70, "moon": 0.20},
+    "PAXG_NEXO":   {"tier": "CORE",   "base": 0.12, "min": 0.05, "max": 0.15, "exit": 0.78, "reduce": 0.68, "moon": 0.25},
 
     # TIER 2: SATELLITE/AGGRESSIVE
-    "VAS":       {"tier": "SAT",  "base": 0.06, "min": 0.00, "max": 0.10, "exit": 0.75, "reduce": 0.65, "moon": 0.25},
-    "VAP":       {"tier": "SAT",  "base": 0.05, "min": 0.00, "max": 0.08, "exit": 0.75, "reduce": 0.65, "moon": 0.25},
-    "ADA_BEEFY": {"tier": "AGGR", "base": 0.05, "min": 0.00, "max": 0.08, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
+    "VAS":         {"tier": "SAT",  "base": 0.06, "min": 0.00, "max": 0.10, "exit": 0.75, "reduce": 0.65, "moon": 0.25},
+    "VAP":         {"tier": "SAT",  "base": 0.04, "min": 0.00, "max": 0.08, "exit": 0.75, "reduce": 0.65, "moon": 0.25},
+    "ADA_MINSWAP": {"tier": "AGGR", "base": 0.05, "min": 0.00, "max": 0.08, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
 
     # TIER 3: CASH/DEFENSIVE
-    "USD_NEXO":  {"tier": "CASH", "base": 0.10}, 
-    "JUDO_TD":   {"tier": "CASH", "base": 0.10},
+    "USD_LEDN":    {"tier": "CASH", "base": 0.06}, 
+    "USD_NEXO":    {"tier": "CASH", "base": 0.07}, 
+    "JUDO_TD":     {"tier": "CASH", "base": 0.10},
 }
 
 MOMENTUM_OVERRIDE = {
