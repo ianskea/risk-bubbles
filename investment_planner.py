@@ -48,26 +48,25 @@ RISK_PROXY_MAP = {
 # 2. PORTFOLIO CONFIGURATION (Risk-Adaptive v2.0)
 # =========================================================
 # Format: ticker/label: (base, min, max, exit_threshold, reduce_threshold, moonbag)
-# Thresholds pulled from v2 logic: Crypto=0.85/0.75, Core=0.80/0.70, etc.
 
 ASSET_CONFIG = {
-    # TIER 1: CORE (Higher tolerance)
-    "BTC_COLD":    {"tier": "CRYPTO", "base": 0.12, "min": 0.02, "max": 0.20, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
-    "ETH_COLD":    {"tier": "CRYPTO", "base": 0.08, "min": 0.02, "max": 0.12, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
-    "ETH_STAKE":   {"tier": "CRYPTO", "base": 0.08, "min": 0.02, "max": 0.12, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
-    "VGS":         {"tier": "CORE",   "base": 0.12, "min": 0.05, "max": 0.18, "exit": 0.80, "reduce": 0.70, "moon": 0.20},
-    "MQG":         {"tier": "CORE",   "base": 0.10, "min": 0.05, "max": 0.15, "exit": 0.80, "reduce": 0.70, "moon": 0.20},
-    "PAXG_NEXO":   {"tier": "CORE",   "base": 0.12, "min": 0.05, "max": 0.15, "exit": 0.78, "reduce": 0.68, "moon": 0.25},
+    # TIER 1: CORE (User-Requested Targets)
+    "BTC_COLD":    {"tier": "CRYPTO", "base": 0.18, "min": 0.05, "max": 0.30, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
+    "ETH_COLD":    {"tier": "CRYPTO", "base": 0.05, "min": 0.02, "max": 0.15, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
+    "ETH_STAKE":   {"tier": "CRYPTO", "base": 0.05, "min": 0.02, "max": 0.15, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
+    "VGS":         {"tier": "CORE",   "base": 0.15, "min": 0.05, "max": 0.25, "exit": 0.80, "reduce": 0.70, "moon": 0.20},
+    "MQG":         {"tier": "CORE",   "base": 0.10, "min": 0.05, "max": 0.20, "exit": 0.80, "reduce": 0.70, "moon": 0.20},
+    "PAXG_NEXO":   {"tier": "CORE",   "base": 0.08, "min": 0.02, "max": 0.15, "exit": 0.78, "reduce": 0.68, "moon": 0.25},
 
     # TIER 2: SATELLITE/AGGRESSIVE
-    "VAS":         {"tier": "SAT",  "base": 0.06, "min": 0.00, "max": 0.10, "exit": 0.75, "reduce": 0.65, "moon": 0.25},
-    "VAP":         {"tier": "SAT",  "base": 0.04, "min": 0.00, "max": 0.08, "exit": 0.75, "reduce": 0.65, "moon": 0.25},
-    "ADA_MINSWAP": {"tier": "AGGR", "base": 0.05, "min": 0.00, "max": 0.08, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
+    "VAS":         {"tier": "SAT",  "base": 0.06, "min": 0.00, "max": 0.12, "exit": 0.75, "reduce": 0.65, "moon": 0.25},
+    "VAP":         {"tier": "SAT",  "base": 0.04, "min": 0.00, "max": 0.10, "exit": 0.75, "reduce": 0.65, "moon": 0.25},
+    "ADA_MINSWAP": {"tier": "AGGR", "base": 0.05, "min": 0.00, "max": 0.10, "exit": 0.85, "reduce": 0.75, "moon": 0.40},
 
-    # TIER 3: CASH/DEFENSIVE
-    "USD_LEDN":    {"tier": "CASH", "base": 0.06}, 
+    # TIER 3: CASH/DEFENSIVE (Targets)
+    "USD_LEDN":    {"tier": "CASH", "base": 0.10}, 
     "USD_NEXO":    {"tier": "CASH", "base": 0.07}, 
-    "JUDO_TD":     {"tier": "CASH", "base": 0.10},
+    "JUDO_TD":     {"tier": "CASH", "base": 0.07},
 }
 
 MOMENTUM_OVERRIDE = {
@@ -79,8 +78,12 @@ MOMENTUM_OVERRIDE = {
 
 portfolio_config = {
     "current_holdings": {
-        "MQG": 350, 
-        "SEMI_RBTZ_FANG": 35000 
+        "BTC_COLD": 0.12,  # ~16k (8%)
+        "ADA_MINSWAP": 4700, # ~4k (2%)
+        "PAXG_NEXO": 5.5,   # ~24k (12%)
+        "MQG": 147,        # ~30k (15%)
+        "USD_LEDN": 4000,   # (AUD equivalent)
+        "VGS": 10          # Small start
     }
 }
 
@@ -100,7 +103,6 @@ def get_latest_risk_data(proxies):
         try:
             df, _, meta = analyze_asset(ticker)
             if meta.get("reason"):
-                print(f"  Warning for {ticker}: {meta['reason']}")
                 ticker_stats[ticker] = None
             else:
                 ticker_stats[ticker] = {
@@ -108,7 +110,6 @@ def get_latest_risk_data(proxies):
                     "momentum": calculate_momentum_score(df)
                 }
         except Exception as e:
-            print(f"  Critical Error for {ticker}: {e}")
             ticker_stats[ticker] = None
             
     for label, ticker in proxies.items():
@@ -153,7 +154,7 @@ def calculate_dynamic_weight(asset, cfg, stats):
         
     # 3. Value Zone (< 0.30)
     if risk < 0.30:
-        boost = 1.5 if tier in ["CORE", "CRYPTO"] else 1.2
+        boost = 1.4 if tier in ["CORE", "CRYPTO"] else 1.2
         return min(max_w, base * boost)
         
     return base
@@ -185,73 +186,62 @@ def run_portfolio_optimizer(config, data, injection, risk_data):
     
     for asset, cfg in ASSET_CONFIG.items():
         stats = risk_data.get(asset)
-        
         target_w = calculate_dynamic_weight(asset, cfg, stats)
-        raw_weights[asset] = {
-            "weight": target_w, 
-            "stats": stats
-        }
+        raw_weights[asset] = {"weight": target_w, "stats": stats}
         
         if cfg["tier"] == "CASH":
             cash_base_weight += cfg["base"]
         else:
             risk_assets_weight += target_w
             
-    # --- PHASE 2: Normalize / Distribute Residual ---
+    # --- PHASE 2: Normalize ---
     total_allocated = risk_assets_weight + cash_base_weight
-    residual = 1.0 - total_allocated
-    
-    final_weights = {}
-    if residual < 0:
-        factor = 1.0 / total_allocated
-        for a in raw_weights:
-            final_weights[a] = raw_weights[a]["weight"] * factor
-    else:
-        cash_assets = [k for k,v in ASSET_CONFIG.items() if v["tier"] == "CASH"]
-        cash_weight_sum = sum([ASSET_CONFIG[k]["base"] for k in cash_assets])
-        
-        for a, w_data in raw_weights.items():
-            if a in cash_assets:
-                share = (ASSET_CONFIG[a]["base"] / cash_weight_sum) * residual
-                final_weights[a] = w_data["weight"] + share
-            else:
-                final_weights[a] = w_data["weight"]
+    final_weights = {a: (data["weight"] / total_allocated) for a, data in raw_weights.items()}
 
     # --- PHASE 3: Generate Actions ---
     for asset, weight in final_weights.items():
         w_data = raw_weights[asset]
         stats = w_data["stats"]
         risk = stats['risk'] if stats else None
-        momentum = stats['momentum'] if stats else 0
         
         asset_price = data.get(asset, [0])[0]
         current_asset_val = config["current_holdings"].get(asset, 0) * asset_price
+        current_weight = current_asset_val / total_wealth
         
         target_aud = total_wealth * weight
-        action_buy = max(0, target_aud - current_asset_val)
+        action_diff = target_aud - current_asset_val
         
         yield_pa = data.get(asset, [0, 0])[1]
         custody = data.get(asset, [0, 0, "Unknown"])[2]
         
-        # Thresholds for Status
+        # Thresholds for Status (v2.0 Asymmetric)
         cfg = ASSET_CONFIG.get(asset, {})
         exit_t = cfg.get("exit", 0.75)
-        # Momentum Adjustment for status text
-        if MOMENTUM_OVERRIDE["enabled"] and momentum > MOMENTUM_OVERRIDE["threshold"]:
-            exit_t += MOMENTUM_OVERRIDE["risk_extension"]
+        reduce_t = cfg.get("reduce", 0.65)
 
-        # Status Logic
-        status = "BUY"
+        # Status Logic Refinement
+        status = "HOLD"
         if risk is None:
-            status = "❌ ERROR (Metric Failure)"
-            action_buy = 0
-        elif risk > exit_t:
-            status = "⚠️ REDUCE (High Risk)"
-            if action_buy > 0: action_buy = 0
-        elif risk < 0.30 and action_buy > 0:
-            status = "🟢 VALUE OVERWEIGHT"
-        elif action_buy == 0:
-            status = "HOLD (Target Met)"
+            status = "❌ ERROR"
+        elif action_diff > 10: # BUYING
+            if risk == 0.0:
+                status = "⚪ CASH BUILD"
+            elif risk < 0.30:
+                # Value Buy means underweight but it's cheap
+                # Value Overweight means already at target but it's so cheap we buy more
+                if current_weight < cfg.get("base", 0):
+                    status = "🟢 VALUE BUY"
+                else:
+                    status = "🟢 VALUE OVERWEIGHT"
+            else:
+                status = "🟢 BUY"
+        elif action_diff < -10: # SELLING/REDUCING
+            if risk > reduce_t:
+                status = "🔴 REDUCE (High Risk)"
+            else:
+                status = "🟠 REBALANCE (Overweight)"
+        else:
+            status = "⚫ HOLD (Target Met)"
 
         if custody in ["Platform", "DeFi"]:
             platform_risk_cap += target_aud
@@ -262,17 +252,18 @@ def run_portfolio_optimizer(config, data, injection, risk_data):
         results.append({
             "Asset": asset,
             "Risk": f"{risk:.2f}" if risk is not None else "N/A",
-            "Target_%": f"{weight*100:.1f}%",
-            "Action_BUY": action_buy,
-            "Annual_Income": annual_income,
-            "Custody": custody,
+            "CURR%": f"{current_weight*100:.1f}%",
+            "TARGET%": f"{weight*100:.1f}%",
+            "ACTION": f"${action_diff:,.0f}",
+            "Income": annual_income,
             "Status": status
         })
     
     return pd.DataFrame(results), total_wealth, platform_risk_cap, total_annual_income
 
-def generate_dca_plan(risk_data, data):
-    print("\n--- 6-MONTH RISK-ADJUSTED DCA STRATEGY ($3,000/mo) ---")
+def generate_dca_plan(risk_data):
+    print("\n--- PROVISIONAL 6-MONTH DCA ROADMAP (Current Snapshot) ---")
+    print("Note: Re-run monthly as market risks change.\n")
     tradable_assets = [k for k, v in RISK_PROXY_MAP.items() if v]
     
     asset_risks = []
@@ -280,16 +271,15 @@ def generate_dca_plan(risk_data, data):
         stats = risk_data[k]
         asset_risks.append((k, stats['risk'] if stats else 0.5))
     
+    # Sort by risk (buy lowest risk first)
     sorted_assets = sorted(asset_risks, key=lambda x: x[1])
     
     dca_plan = []
     months = ["January", "February", "March", "April", "May", "June"]
-    
     for i, month in enumerate(months):
         asset, risk = sorted_assets[i % len(sorted_assets)]
         obj = "Value Accumulation" if risk < 0.3 else "Strategic Top-up"
         if risk > 0.7: obj = "Defensive Cash Building"
-        
         dca_plan.append([month, asset, f"Risk {risk:.2f}: {obj}"])
         
     return pd.DataFrame(dca_plan, columns=["Month", "Ticker", "Objective"])
@@ -300,12 +290,11 @@ if __name__ == "__main__":
         portfolio_config, DATA, INITIAL_INJECTION, risk_data
     )
     print(f"Total Portfolio Value Post-Injection: ${total_cap:,.2f}")
-    print(f"Total Platform Risk (Nexo/Ledn/Beefy): ${risk_cap:,.2f} ({round(risk_cap/total_cap*100, 1)}%)")
+    print(f"Total Platform Risk (Nexo/Ledn/Minswap): ${risk_cap:,.2f} ({round(risk_cap/total_cap*100, 1)}%)")
     print(f"Est. Annual Pre-tax Income: ${total_income:,.2f} (Yield: {round(total_income/total_cap*100, 2)}%)")
-    print("\n--- IMMEDIATE ACTION BUY LIST ---")
-    display_cols = ['Asset', 'Target_%', 'Risk', 'Action_BUY', 'Status']
-    df_display = df_exec.copy()
-    df_display['Action_BUY'] = df_display['Action_BUY'].apply(lambda x: f"${x:,.2f}")
-    print(df_display[display_cols].to_string(index=False))
-    dca_df = generate_dca_plan(risk_data, DATA)
+    
+    print("\n--- PORTFOLIO MASTER TABLE ---")
+    print(df_exec[['Asset', 'CURR%', 'TARGET%', 'Risk', 'ACTION', 'Status']].to_string(index=False))
+    
+    dca_df = generate_dca_plan(risk_data)
     print(dca_df.to_string(index=False))
