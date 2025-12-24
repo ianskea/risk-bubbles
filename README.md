@@ -28,6 +28,12 @@ Stress tests the risk-adaptive logic across historical data to verify alpha and 
   ./venv/bin/python3 adaptive_portfolio_v3.py
   ```
 
+### 5. Portfolio Management (Manage Holdings)
+Add, list, or clear your local (private) investment parcels.
+```bash
+./venv/bin/python3 manage_holdings.py --help
+```
+
 ---
 
 # 📅 Institutional Cadence (How to Use)
@@ -48,6 +54,11 @@ To get the most out of this system, follow this structured routine:
 **Frequency**: Once every 3 months  
 **Command**: `./venv/bin/python3 backtest_strategy.py`  
 **Purpose**: Validation. Verify that the v2.0 logic is still maintaining its statistical edge and alpha over buy-and-hold in the current regime.
+
+### 4. Portfolio Maintenance (Data Hygiene)
+**Frequency**: Whenever you buy or sell assets  
+**Command**: `./venv/bin/python3 manage_holdings.py`  
+**Purpose**: Accuracy. Use this to update your local SQLite database with new purchase parcels so the planner can track cost-basis, PnL, and CGT status.
 
 ### 4. The "Panic/Mania" Check (Ad-hoc)
 **Frequency**: When markets move +/- 15% in a week  
