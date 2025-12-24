@@ -5,7 +5,7 @@
 - `run_validated_analysis.py`: CLI entry for validation/analysis modes; option 1 runs the validation suite, option 3 runs a quick single-asset check.
 - `enhanced_main.py`: batch portfolio reporting; writes reports to `output/` and charts to `output/charts/{ticker}_comprehensive.png`.
 - `main.py` and `risk_analyzer.py`: original baseline flow kept for comparison.
-- Support files: `model_validation.py` (stat tests), `perf_test.py` (micro-benchmark), `requirements.txt`, `.env.example` (copy to `.env`), and generated assets in `output/`.
+- Support files: `model_validation.py` (stat tests), `perf_test.py` (micro-benchmark), `investment_planner.py`/`system_audit.py` (ancillary tooling), `requirements.txt`, `.env.example` (copy to `.env`), and generated assets in `output/`.
 
 ## Setup & Key Commands
 - Install deps: `pip install -r requirements.txt` (use the provided `venv/` or create your own virtualenv).

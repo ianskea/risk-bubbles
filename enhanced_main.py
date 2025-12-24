@@ -209,106 +209,47 @@ def generate_ai_analysis(ticker, price, risk, metrics, meta):
 
 def analyze_market_cycle():
     """
-    Analyzes Capital Cascade Model (Crypto, Metals, Macro, China, Social).
-    Generates Composite Risk Score and Dashboard.
+    Context-only macro snapshot (non-blocking).
     """
     print("Analyzing Capital Cascade Model...")
-    from enhanced_risk_analyzer import fetch_data, analyze_asset, calculate_mlr, calculate_yield_corr
+    from enhanced_risk_analyzer import analyze_asset
     
-    cycle_report = "RISK-BUBBLE ANALYSIS: CAPITAL CASCADE DASHBOARD\n" + "="*50 + "\n"
+    cycle_report = "RISK-BUBBLE ANALYSIS: CAPITAL CASCADE DASHBOARD (CONTEXT ONLY)\n" + "="*50 + "\n"
     
     try:
-        # -- 1. FETCH DATA & ANALYZE CORE ASSETS --
-        # Crypto
-        btc_df, _, btc_meta = analyze_asset("BTC-USD")
-        eth_df, _, eth_meta = analyze_asset("ETH-USD")
-        
-        # Metals
-        gold_df, _, gold_meta = analyze_asset("GC=F")
-        silver_df, _, silver_meta = analyze_asset("SI=F")
-        gdx_df, _, gdx_meta = analyze_asset("GDX")
-        
-        # Macro
-        tnx_df = fetch_data("^TNX") # 10 Year Yield
-        
-        # -- 2. CALCULATE METRICS --
-        # Ratios
-        gsr = gold_meta['last_price'] / silver_meta['last_price'] if silver_meta['last_price'] else 0
-        eth_btc = eth_meta['last_price'] / btc_meta['last_price'] if btc_meta['last_price'] else 0
-        mlr = calculate_mlr(gold_df, gdx_df)
-        yield_corr = calculate_yield_corr(gold_df, tnx_df)
-        
-        # BTC Dominance Proxy (ETH/BTC)
-        # Low ETH/BTC = High BTC.D (Bear/Early Bull). High ETH/BTC = Low BTC.D (Alt Season).
-        
-        # -- 3. COMPONENT RISK SCORES (0-1) --
-        # Crypto Risk: Avg of BTC & ETH Risk (proxy for market)
-        crypto_risk = (btc_meta['last_risk'] + eth_meta['last_risk']) / 2
-        
-        # Metals Risk: Avg of Gold & Silver Risk
-        metals_risk = (gold_meta['last_risk'] + silver_meta['last_risk']) / 2
-        
-        # Macro Risk: Based on Yield Corr & MLR Divergence
-        # If Corr > 0.3 (Broken) -> High Risk. If MLR < 0.5 (Cheap) -> Low Risk?
-        # User formula implies Macro is input. Let's map Yield Corr to 0-1.
-        # Corr -1 (Good) -> 0. Corr +1 (Bad) -> 1.
-        # Adjusted: (Corr + 1) / 2?
-        macro_risk = (yield_corr + 1) / 2 
-        # But user says "Macro Risk: 0.70 (HIGH)" when Corr is ~0 (Broken).
-        # So Normalized: 0.5 + (Corr * 0.5)? If Corr=0, Risk=0.5. If Corr=0.4, Risk=0.7.
-        macro_risk = 0.5 + (yield_corr * 0.5)
-        
-        # China (Static 0.3) & Social (Static 0.55) as per User Request
-        china_risk = 0.30
-        social_risk = 0.55
-        
-        # -- 4. COMPOSITE SCORE --
-        # Formula: (Crypto * 0.25) + (Metals * 0.25) + (Macro * 0.25) + (China * 0.15) + (Social * 0.10)
-        composite_score = (crypto_risk * 0.25) + \
-                          (metals_risk * 0.25) + \
-                          (macro_risk * 0.25) + \
-                          (china_risk * 0.15) + \
-                          (social_risk * 0.10)
-        
-        composite_score = round(composite_score, 2)
-                          
-        # Status Label
-        status_label = "MODERATE"
-        if composite_score < 0.2: status_label = "EXTREME LOW (BUY ALL)"
-        elif composite_score < 0.3: status_label = "LOW (ACCUMULATE)"
-        elif composite_score < 0.6: status_label = "MODERATE"
-        elif composite_score < 0.7: status_label = "HIGH (WATCH FOR SELL)"
-        elif composite_score < 0.85: status_label = "VERY HIGH (WARNING)"
-        else: status_label = "EXTREME (SELL)"
+        def safe_asset(t):
+            try:
+                df, _, meta = analyze_asset(t)
+                if meta.get("reason") or df.empty:
+                    return pd.DataFrame(), {"last_price": 0, "last_risk": 0}
+                return df, meta
+            except Exception:
+                return pd.DataFrame(), {"last_price": 0, "last_risk": 0}
 
-        # -- 5. GENERATE REPORT --
-        cycle_report += f"\nCOMPOSITE RISK: {composite_score:.2f} ({status_label})\n"
-        cycle_report += "-"*50 + "\n"
-        
+        # Core assets (best effort)
+        btc_df, btc_meta = safe_asset("BTC-USD")
+        eth_df, eth_meta = safe_asset("ETH-USD")
+        gold_df, gold_meta = safe_asset("GC=F")
+        silver_df, silver_meta = safe_asset("SI=F")
+
         def get_signal(r):
             if r < 0.3: return "🟢 [BUY]"
             if r > 0.70: return "🔴 [SELL]"
             return "🟡 [HOLD]"
-        
-        cycle_report += "ASSET STATUS:\n"
+
+        # Ratios for color
+        gsr = gold_meta['last_price'] / silver_meta['last_price'] if silver_meta['last_price'] else 0
+        eth_btc = eth_meta['last_price'] / btc_meta['last_price'] if btc_meta['last_price'] else 0
+
+        cycle_report += "ASSET STATUS (CONTEXT):\n"
         cycle_report += f"- BTC:    ${btc_meta['last_price']:.0f} | Risk: {round(btc_meta['last_risk'],2):.2f} {get_signal(round(btc_meta['last_risk'],2))}\n"
         cycle_report += f"- ETH:    ${eth_meta['last_price']:.0f} | Risk: {round(eth_meta['last_risk'],2):.2f} {get_signal(round(eth_meta['last_risk'],2))}\n"
         cycle_report += f"- GOLD:   ${gold_meta['last_price']:.1f} | Risk: {round(gold_meta['last_risk'],2):.2f} {get_signal(round(gold_meta['last_risk'],2))}\n"
-        cycle_report += f"- SILVER: ${silver_meta['last_price']:.1f} | Risk: {round(silver_meta['last_risk'],2):.2f} {get_signal(round(silver_meta['last_risk'],2))}\n"
-        cycle_report += f"- GDX:    ${gdx_meta['last_price']:.2f} | Risk: {round(gdx_meta['last_risk'],2):.2f} {get_signal(round(gdx_meta['last_risk'],2))}\n\n"
+        cycle_report += f"- SILVER: ${silver_meta['last_price']:.1f} | Risk: {round(silver_meta['last_risk'],2):.2f} {get_signal(round(silver_meta['last_risk'],2))}\n\n"
         
-        cycle_report += "KEY METRICS:\n"
-        cycle_report += f"- Gold/Silver Ratio: {gsr:.2f} ({'Accumulation' if gsr > 80 else 'Distribution'})\n"
+        cycle_report += "KEY METRICS (COLOR ONLY):\n"
+        cycle_report += f"- Gold/Silver Ratio: {gsr:.2f}\n"
         cycle_report += f"- ETH/BTC Ratio:     {eth_btc:.4f}\n"
-        cycle_report += f"- Miner Lev (MLR):   {mlr:.2f}x ({'Undervalued' if mlr < 0.5 else 'Normal'})\n"
-        cycle_report += f"- Yield-Gold Corr:   {yield_corr:.2f} ({'Broken' if yield_corr > -0.3 else 'Normal'})\n\n"
-        
-        cycle_report += "RISK BREAKDOWN:\n"
-        cycle_report += f"- Crypto: {crypto_risk:.2f}\n"
-        cycle_report += f"- Metals: {metals_risk:.2f}\n"
-        cycle_report += f"- Macro:  {macro_risk:.2f}\n"
-        cycle_report += f"- China:  {china_risk:.2f} (Est)\n"
-        cycle_report += f"- Social: {social_risk:.2f} (Est)\n"
 
     except Exception as e:
         cycle_report += f"Error calculating cycle metrics: {e}\n"
@@ -320,8 +261,6 @@ def analyze_market_cycle():
     context = {
         "gsr": locals().get('gsr', 0),
         "eth_btc": locals().get('eth_btc', 0),
-        "mlr": locals().get('mlr', 0),
-        "composite_score": locals().get('composite_score', 0)
     }
     return cycle_report, context
 
@@ -333,8 +272,13 @@ def main():
     
     report_path = os.path.join(OUTPUT_DIR, "institutional_analysis_report.txt")
     
-    # --- MACRO CYCLE ---
-    cycle_text, macro_context = analyze_market_cycle()
+    # --- MACRO CYCLE (Context Only) ---
+    try:
+        cycle_text, macro_context = analyze_market_cycle()
+        cycle_text = "MACRO DASHBOARD (CONTEXT ONLY)\n" + "-"*60 + "\n" + cycle_text
+    except Exception as e:
+        cycle_text = f"MACRO DASHBOARD (CONTEXT ONLY)\n{'-'*60}\nUnavailable: {e}\n"
+        macro_context = {}
     
     valid_assets = []
     invalid_assets = []
@@ -376,7 +320,7 @@ def main():
             # Score >= 60: PASS. Actionable.
             
             is_valid = score >= 60
-            
+
             # Common Data
             asset_data = {
                 "name": name,
@@ -437,7 +381,6 @@ def main():
             max_dd_text = f"{max_dd_val*100:.1f}%" if not pd.isna(max_dd_val) else "N/A"
             dd_context.append(f"Drawdown now: {meta['drawdown_current']*100:.1f}% (max {max_dd_text})")
         context_line = "; ".join(ma_context + dd_context) if (ma_context or dd_context) else "N/A"
-
         section = f"""
 ASSET: {asset['name']} ({asset['ticker']})
 Price: ${asset['price']:.2f}
