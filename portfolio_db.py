@@ -164,21 +164,41 @@ def save_snapshot(entity_name, total_val, total_pnl):
     return True
 
 def seed_sample_data():
-    """Seeds initial assets and sample parcels."""
-    # Seed Assets from existing v2.0 logic
+    """Seeds initial assets and sample parcels based on user's full portfolio."""
+    # Seed Assets from user provided list
+    # Ticker/Label, Tier, Proxy, Base, Min, Max, Exit, Reduce, Moon, Yield, Custody
     initial_assets = [
-        ("BTC_COLD", "CRYPTO", "BTC-USD", 0.18, 0.05, 0.30, 0.85, 0.75, 0.40, 0.000, "Cold Storage"),
+        # CRYPTO
+        ("BTC_COLD", "CRYPTO", "BTC-USD", 0.15, 0.05, 0.30, 0.85, 0.75, 0.40, 0.000, "Cold Storage"),
         ("ETH_COLD", "CRYPTO", "ETH-USD", 0.10, 0.02, 0.20, 0.85, 0.75, 0.40, 0.000, "Cold Storage"),
-        ("ETH_STAKE", "CRYPTO", "ETH-USD", 0.05, 0.02, 0.15, 0.85, 0.75, 0.40, 0.045, "Platform"),
-        ("VGS", "CORE", "VGS.AX", 0.15, 0.05, 0.25, 0.80, 0.70, 0.20, 0.021, "Broker"),
-        ("MQG", "CORE", "MQG.AX", 0.10, 0.05, 0.20, 0.80, 0.70, 0.20, 0.035, "Broker"),
-        ("PAXG_NEXO", "CORE", "GC=F", 0.08, 0.02, 0.15, 0.78, 0.68, 0.25, 0.040, "Platform"),
-        ("VAS", "SAT", "VAS.AX", 0.06, 0.00, 0.12, 0.75, 0.65, 0.25, 0.038, "Broker"),
-        ("VAP", "SAT", "VAP.AX", 0.04, 0.00, 0.10, 0.75, 0.65, 0.25, 0.041, "Broker"),
-        ("ADA_MINSWAP", "AGGR", "ADA-USD", 0.05, 0.00, 0.10, 0.85, 0.75, 0.40, 0.120, "DeFi"),
-        ("USD_LEDN", "CASH", None, 0.10, 0.10, 0.10, 0.00, 0.00, 1.00, 0.070, "Platform"),
-        ("USD_NEXO", "CASH", None, 0.07, 0.07, 0.07, 0.00, 0.00, 1.00, 0.100, "Platform"),
-        ("JUDO_TD", "CASH", None, 0.07, 0.07, 0.07, 0.00, 0.00, 1.00, 0.050, "Bank")
+        ("ADA_USD",  "CRYPTO", "ADA-USD", 0.03, 0.00, 0.08, 0.85, 0.75, 0.40, 0.000, "DeFi"),
+        
+        # COMMODITIES
+        ("GOLD",     "COMMODITY", "GC=F", 0.05, 0.02, 0.15, 0.78, 0.68, 0.25, 0.000, "Cold Storage"),
+        ("SILVER",   "COMMODITY", "SI=F", 0.02, 0.00, 0.05, 0.78, 0.68, 0.25, 0.000, "Cold Storage"),
+        
+        # CORE (ASX & GLOBAL)
+        ("BHP.AX",   "CORE", "BHP.AX", 0.06, 0.02, 0.12, 0.80, 0.70, 0.20, 0.051, "Broker"),
+        ("RIO.AX",   "CORE", "RIO.AX", 0.04, 0.01, 0.10, 0.80, 0.70, 0.20, 0.048, "Broker"),
+        ("FMG.AX",   "CORE", "FMG.AX", 0.04, 0.01, 0.10, 0.80, 0.70, 0.20, 0.075, "Broker"),
+        ("MQG.AX",   "CORE", "MQG.AX", 0.08, 0.04, 0.15, 0.80, 0.70, 0.20, 0.035, "Broker"),
+        ("NDQ.AX",   "CORE", "NDQ.AX", 0.08, 0.04, 0.15, 0.80, 0.70, 0.20, 0.005, "Broker"),
+        ("FANG.AX",  "CORE", "FANG.AX", 0.05, 0.02, 0.10, 0.80, 0.70, 0.20, 0.000, "Broker"),
+        
+        # SAT (SATELLITE / GROWTH)
+        ("MIN.AX",   "SAT", "MIN.AX", 0.03, 0.00, 0.08, 0.75, 0.65, 0.25, 0.025, "Broker"),
+        ("PLS.AX",   "SAT", "PLS.AX", 0.03, 0.00, 0.08, 0.75, 0.65, 0.25, 0.032, "Broker"),
+        ("S32.AX",   "SAT", "S32.AX", 0.02, 0.00, 0.06, 0.75, 0.65, 0.25, 0.041, "Broker"),
+        ("IGO.AX",   "SAT", "IGO.AX", 0.02, 0.00, 0.06, 0.75, 0.65, 0.25, 0.035, "Broker"),
+        ("SDR.AX",   "SAT", "SDR.AX", 0.03, 0.00, 0.08, 0.75, 0.65, 0.25, 0.000, "Broker"),
+        ("SEMI.AX",  "SAT", "SEMI.AX", 0.04, 0.01, 0.08, 0.75, 0.65, 0.25, 0.000, "Broker"),
+        ("QRE.AX",   "SAT", "QRE.AX", 0.03, 0.00, 0.08, 0.75, 0.65, 0.25, 0.045, "Broker"),
+        ("RBTZ.AX",  "SAT", "RBTZ.AX", 0.03, 0.00, 0.08, 0.75, 0.65, 0.25, 0.000, "Broker"),
+        ("ASIA.AX",  "SAT", "ASIA.AX", 0.04, 0.01, 0.08, 0.75, 0.65, 0.25, 0.012, "Broker"),
+        ("VAP.AX",   "SAT", "VAP.AX", 0.03, 0.00, 0.08, 0.75, 0.65, 0.25, 0.041, "Broker"),
+        
+        # CASH (Reserved for DCA)
+        ("USD_CASH", "CASH", None, 0.05, 0.05, 0.05, 0.00, 0.00, 1.00, 0.050, "Bank")
     ]
     for a in initial_assets:
         add_asset(*a)
@@ -187,12 +207,9 @@ def seed_sample_data():
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM parcels")
     if cursor.fetchone()[0] == 0:
-        print("Seeding fresh sample parcels...")
-        add_parcel("Ocean Embers", "BTC_COLD", 0.12, 12000, "2024-05-10")
-        add_parcel("Ocean Embers", "PAXG_NEXO", 5.5, 20000, "2024-12-01")
-        add_parcel("Ocean Embers", "MQG", 147, 28000, "2023-11-20") 
-        add_parcel("Aegirs Fire SuperFund", "JUDO_TD", 56657, 56657, "2024-06-01", "2026-06-01")
-        print("Sample parcels seeded.")
+        print("Note: Registry updated, but no live parcels found. Seeding minimal samples for backtest visibility...")
+        add_parcel("Ocean Embers", "BTC_COLD", 0.01, 1000, "2024-01-01")
+        add_parcel("Ocean Embers", "MQG.AX", 5, 1000, "2024-01-01")
     conn.close()
 
 if __name__ == "__main__":
