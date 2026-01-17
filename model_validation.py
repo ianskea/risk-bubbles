@@ -31,8 +31,8 @@ def validate_model(df: pd.DataFrame, risk_col: str = 'risk_total', forward_windo
     val_df['sma_200'] = val_df['sma_200'].bfill()
 
     trend_strength = (val_df['Close'] > val_df['sma_200']).mean()
-    # If Price is above 200 SMA more than 50% of the time, it's Momentum biased
-    is_momentum = trend_strength > 0.50
+    # If Price is above 200 SMA more than 30% of the time, it's Momentum biased
+    is_momentum = trend_strength > 0.30
     
     regime_type = "MOMENTUM" if is_momentum else "MEAN_REVERSION"
     
