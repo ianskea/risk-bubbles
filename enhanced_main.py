@@ -283,6 +283,13 @@ def main():
     try:
         cycle_text, macro_context = analyze_market_cycle()
         cycle_text = "MACRO DASHBOARD (CONTEXT ONLY)\n" + "-"*60 + "\n" + cycle_text
+        
+        # [NEW] MARKET HEALTH ADDITION
+        print("Analyzing Market Health (Cowen Model)...")
+        from market_health import get_market_health_summary
+        health_text = get_market_health_summary()
+        cycle_text += "\n" + health_text
+        
     except Exception as e:
         cycle_text = f"MACRO DASHBOARD (CONTEXT ONLY)\n{'-'*60}\nUnavailable: {e}\n"
         macro_context = {}
