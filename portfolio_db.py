@@ -39,7 +39,7 @@ def init_db():
     ''')
 
     # Parcels Table (Refactored to use Foreign Key to assets.ticker)
-    cursor.execute('DROP TABLE IF EXISTS parcels') # Recreate to remove hardcoded CHECK
+    # cursor.execute('DROP TABLE IF EXISTS parcels') # REMOVED: Destructive!
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS parcels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
