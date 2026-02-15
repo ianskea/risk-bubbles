@@ -86,7 +86,7 @@ def run_quick_check():
         print("\n--------------------------------")
         print(f"Asset: {ticker}")
         print(f"Price: {last['Close']:.2f}")
-        print(f"Risk:  {last['risk_total']:.2f} ({meta.get('rating')})")
+        print(f"Risk:  {last['risk_total']:.2f} ({meta.get('rating')}) | {meta.get('gone_home', 'N/A')}")
         print("--------------------------------")
         print("Factors:")
         print(f"  Valuation: {last['risk_valuation']:.2f}")

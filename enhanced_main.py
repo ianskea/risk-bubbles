@@ -11,6 +11,7 @@ import pandas as pd
 
 from enhanced_risk_analyzer import analyze_asset
 from model_validation import validate_model
+from sentiment_analyzer import fetch_crypto_sentiment, get_sentiment_advice
 
 # Load Environment Variables
 load_dotenv()
@@ -55,6 +56,13 @@ TICKERS = {
     "BetaShares Asia": "ASIA.AX",
     "Vanguard Prop": "VAP.AX",
     "BetaShares NDQ": "NDQ.AX"
+}
+
+# [NEW] Bitcoin On-Chain Floors (Based on Cowen/On-Chain Research)
+# These are dynamic but updated here for current macro context.
+BTC_ON_CHAIN_FLOORS = {
+    "Realized Price": 55000,
+    "Balance Price": 40000
 }
 
 OUTPUT_DIR = "output"
@@ -166,6 +174,7 @@ def generate_ai_analysis(ticker, price, risk, metrics, meta):
     Provide a professional Institutional Risk Assessment for {ticker}.
     Current Price: ${price:.2f}
     Composite Risk Score: {risk:.2f} (0.0 = Buy/Value, 1.0 = Sell/Bubble)
+    Gone Home Status: {meta.get('gone_home', 'N/A')}
     
     Interpretation Rules (v2.0 Asymmetric):
     - Value Zone (< 0.30): Institutional Accumulation (Buy).
@@ -180,6 +189,7 @@ def generate_ai_analysis(ticker, price, risk, metrics, meta):
     - Trend: Distance to 50D MA {ma50}, 200D MA {ma200}
     - Drawdown: Current {dd_cur}, Max {dd_max}
     - Model Validation Score: {metrics.get('score', 0)}/100
+    - On-Chain Floors: {meta.get('on_chain_floors', 'N/A')}
 
     Structure your response clearly:
     1. **Institutional Action Bias**: (Must align with Interpretation Rules above)
@@ -257,6 +267,13 @@ def analyze_market_cycle():
         cycle_report += "KEY METRICS (COLOR ONLY):\n"
         cycle_report += f"- Gold/Silver Ratio: {gsr:.2f}\n"
         cycle_report += f"- ETH/BTC Ratio:     {eth_btc:.4f}\n"
+
+        # Sentiment Integration
+        fng_val, fng_label = fetch_crypto_sentiment()
+        fng_advice = get_sentiment_advice(fng_val, fng_label)
+        cycle_report += f"\nSENTIMENT (FEAR & GREED):\n"
+        cycle_report += f"- Index: {fng_val if fng_val else 'N/A'} ({fng_label})\n"
+        cycle_report += f"- Takeaway: {fng_advice}\n"
 
     except Exception as e:
         cycle_report += f"Error calculating cycle metrics: {e}\n"
@@ -346,6 +363,10 @@ def main():
                 "val_metrics": val_metrics
             }
             
+            # Inject On-Chain Floors for BTC
+            if ticker == "BTC-USD":
+                asset_data["meta"]["on_chain_floors"] = BTC_ON_CHAIN_FLOORS
+                
             plot_comprehensive_analysis(name, ticker, df)
             
             if is_valid:
@@ -400,9 +421,18 @@ def main():
 ASSET: {asset['name']} ({asset['ticker']})
 Price: ${asset['price']:.2f}
 RISK SCORE: {r:.2f}  {signal_str}
+Gone Home Status: {meta.get('gone_home', 'N/A')}
 Validation Score: {asset['score']}/100
-Context: {context_line}
+"""
+        # [NEW] On-Chain Context for BTC
+        if asset['ticker'] == "BTC-USD":
+            floors = meta.get("on_chain_floors", {})
+            floor_text = " | ".join([f"{k}: ${v:,}" for k, v in floors.items()])
+            section += f"On-Chain Floors: {floor_text}\n"
+            
+        section += f"Context: {context_line}\n"
 
+        section += f"""
 AI INSIGHT:
 {asset['ai_text']}
 --------------------------------------------------

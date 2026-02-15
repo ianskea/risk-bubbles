@@ -208,6 +208,23 @@ def calculate_valuation_risk(df: pd.DataFrame, min_periods: int = 200) -> tuple[
     return pd.Series(risk_ensemble, index=df.index), debug_df
 
 
+def get_gone_home_status(risk_score: float) -> str:
+    """
+    Categorizes the regression risk into 'Gone Home' levels:
+    - Basement: Deep value / Strong Support (< 0.35)
+    - Living Room: Fair Value / Mean (0.35 - 0.65)
+    - Attic: Upper Fair Value (0.65 - 0.85)
+    - Outside: Bubble / Expansion (> 0.85)
+    """
+    if risk_score < 0.35:
+        return "Home (Basement)"
+    elif 0.35 <= risk_score <= 0.65:
+        return "Home (Living Room)"
+    elif 0.65 < risk_score <= 0.85:
+        return "Home (Attic)"
+    else:
+        return "Outside (Expansion)"
+
 def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     """
     Main entry point for single asset analysis.
@@ -318,6 +335,7 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
         "drawdown_current": current_dd,
         "drawdown_max": max_dd,
         "volume_missing": not has_volume,
+        "gone_home": get_gone_home_status(last_risk),
         "reason": None,  # reserved for hard stops (e.g., insufficient history)
         **cowen_meta
     }
