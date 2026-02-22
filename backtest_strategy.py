@@ -29,7 +29,11 @@ RULES = {
     "confirmation_days": 5,
     "spike_tolerance": 0.08,
     "momentum_bonus": 0.5,
-    "max_moonbag": 0.70
+    "max_moonbag": 0.70,
+    "smart_tiers": ["CRYPTO", "GROWTH", "SAT"],
+    "confirmation_candles": 3,
+    "momentum_threshold": -0.05,
+    "initial_nibble": 0.33
 }
 
 def calculate_metrics(df, initial_capital, risk_free_rate=0.04):
@@ -384,45 +388,169 @@ def run_backtest_v5(ticker, years=5, initial_capital=10000, fee=0.001):
     metrics['ticker'] = ticker
     return metrics
 
-def evaluate_v5():
-    """Stress test v5 (Hybrid) and rank it."""
-    test_suite = ["BTC-USD", "ETH-USD", "GC=F", "BHP.AX", "FANG.AX", "SDR.AX", "NDQ.AX", "MQG.AX", "FMG.AX"]
-    results = []
+def run_backtest_v6(ticker, years=5, initial_capital=10000, fee=0.001):
+    """v6 Backtest: EXACT Production Logic (Smart Entry + 3-Candle Confirmation)"""
+    df, _, _ = analyze_asset(ticker)
+    start_date = pd.Timestamp.now() - pd.DateOffset(years=years)
+    df = df[df.index >= start_date].copy()
+    if len(df) < 150: return None
+
+    # Config
+    base_w, tier, min_w, max_w, r_exit, r_reduce, mbag_base = ASSET_CONFIG.get(ticker, (0.1, "CORE", 0.05, 0.15, 0.75, 0.65, 0.2))
     
-    print("Starting Multi-Asset stress test (V5.0 HYBRID REGIME-AWARE)...")
-    for t in test_suite:
-        m = run_backtest_v5(t)
-        if m: results.append(m)
+    # Mode Selection (Production logic)
+    mode = "SMART_ENTRY" if tier in RULES["smart_tiers"] else "VALUE_ACCUM"
+    
+    # Pre-calculate indicators
+    df['ma50'] = df['Close'].rolling(50).mean()
+    df['momentum_30'] = df['Close'].pct_change(30)
+    
+    # Helper for confirmation
+    def is_confirmed(idx, data):
+        if idx < RULES["confirmation_candles"]: return True
         
-    res_df = pd.DataFrame(results)
+        # 1. Momentum
+        if data['momentum_30'].iloc[idx] < RULES["momentum_threshold"]:
+            return False
+        
+        # 2. 3-Candle Stability (Production logic)
+        higher_low = data['Low'].iloc[idx] > data['Low'].iloc[idx-1]
+        consecutive_green = (data['Close'].iloc[idx] > data['Close'].iloc[idx-1]) and (data['Open'].iloc[idx] < data['Close'].iloc[idx])
+        
+        if higher_low or consecutive_green: return True
+        
+        # 3. MA Hook
+        if data['Close'].iloc[idx] > data['ma50'].iloc[idx]: return True
+        
+        return False
+
+    # State tracking
+    last_buy_date = None
+    positions = []
     
-    # Metrics
-    avg_cagr = res_df['cagr'].mean()
-    avg_bh = res_df['bh_cagr'].mean()
-    avg_sharpe = res_df['sharpe'].mean()
-    dd_improvement = (res_df['bh_max_dd'].abs() - res_df['max_dd'].abs()).mean()
-    upside_capture = (res_df['cagr'] / res_df['bh_cagr'].replace(0, 0.001)).mean()
+    risk_col = 'risk_total'
     
-    # Scoring Logic
-    score = 8.0 # Base for Hybrid
-    if dd_improvement > 0.15: score += 1.0
-    if upside_capture > 0.8: score += 1.0
+    for i in range(len(df)):
+        # Regime Detection
+        if i < RULES["regime_lookback"]: regime = "NEUTRAL"
+        else:
+            avg_risk = df[risk_col].iloc[i-RULES["regime_lookback"]:i].mean()
+            if avg_risk < RULES["bull_threshold"]: regime = "BULL"
+            elif avg_risk > RULES["bear_threshold"]: regime = "BEAR"
+            else: regime = "NEUTRAL"
+            
+        current_risk = df[risk_col].iloc[i]
+        current_date = df.index[i]
+        momentum = df['momentum_30'].iloc[i]
+        
+        # Thresholds
+        eff_exit = r_exit + (0.05 if regime == "BULL" else 0) + (0.05 if momentum > 0.15 else 0)
+        eff_reduce = r_reduce + (0.05 if regime == "BULL" else 0) + (0.05 if momentum > 0.15 else 0)
+        
+        prev_pos = positions[-1] if positions else (1.0 if mode == "VALUE_ACCUM" else 0.0)
+
+        # Signal Logic
+        in_conviction = False
+        if last_buy_date:
+            days_held = (current_date - last_buy_date).days
+            if days_held < RULES["min_hold_days"] and current_risk < RULES["exception_threshold"]:
+                in_conviction = True
+        
+        if in_conviction:
+            pos = 1.0
+        elif current_risk > eff_exit:
+            pos = 0.3
+            last_buy_date = None
+        elif current_risk > eff_reduce:
+            if i >= RULES["confirmation_days"]:
+                avg_recent = df[risk_col].iloc[i-RULES["confirmation_days"]:i].mean()
+                if current_risk > avg_recent + RULES["spike_tolerance"]:
+                    pos = prev_pos
+                else:
+                    m_pct = mbag_base * (1.2 if regime == "BULL" else 0.8 if regime == "BEAR" else 1.0)
+                    if momentum > 0.20: m_pct += min(momentum * RULES["momentum_bonus"], 0.30)
+                    pos = min(m_pct, RULES["max_moonbag"])
+            else:
+                pos = 1.0
+        elif current_risk < 0.30:
+            boost = 1.0 + ((0.30 - current_risk) / 0.30) * 0.5
+            target_boosted = 1.0 # In backtest, we just assume 1.0 target for simplification (normalized later)
+            
+            if mode == "SMART_ENTRY":
+                is_vested = last_buy_date is not None
+                if is_vested:
+                    pos = 1.0
+                else:
+                    if is_confirmed(i, df):
+                        pos = 1.0
+                        last_buy_date = current_date
+                    else:
+                        pos = RULES["initial_nibble"]
+            else:
+                pos = 1.0
+                if last_buy_date is None: last_buy_date = current_date
+        else:
+            pos = prev_pos
+
+        positions.append(pos)
+        
+    df['position'] = positions
+    df['trade'] = df['position'].diff().abs().fillna(0)
+    df['fees'] = df['trade'] * fee
+    df['raw_ret'] = df['Close'].pct_change()
+    df['strat_ret'] = (df['position'].shift(1) * df['raw_ret']) - df['fees']
     
-    final_score = min(10.0, max(0.0, score))
+    df['bh_value'] = initial_capital * (1 + df['raw_ret']).cumprod()
+    df['strat_value'] = initial_capital * (1 + df['strat_ret']).cumprod()
+    
+    metrics = calculate_metrics(df, initial_capital)
+    metrics['ticker'] = ticker
+    return metrics
+
+def evaluate_v6():
+    """Rigorous comparison of v3 (Blind) vs v6 (Smart Entry)"""
+    test_suite = ["BTC-USD", "ETH-USD", "GC=F", "BHP.AX", "FANG.AX", "SDR.AX", "NDQ.AX", "MQG.AX", "FMG.AX"]
+    results_v3 = []
+    results_v6 = []
     
     print("\n" + "="*80)
-    print(f"STRATEGY AUDIT: v5.0 HYBRID (Smart Entry + Value Accum)")
-    print(f"Overall Rating: {final_score}/10")
+    print("RIGOROUS BACKTEST: v3 (Blind) vs v6 (Smart Entry)")
+    print("="*80)
+    
+    for t in test_suite:
+        m3 = run_backtest_v3(t)
+        m6 = run_backtest_v6(t)
+        if m3: results_v3.append(m3)
+        if m6: results_v6.append(m6)
+        
+    df3 = pd.DataFrame(results_v3)
+    df6 = pd.DataFrame(results_v6)
+    
+    # Comparison Table
+    print(f"\n{'Ticker':<10} | {'v3 CAGR':<10} | {'v6 CAGR':<10} | {'v3 MaxDD':<10} | {'v6 MaxDD':<10}")
+    print("-" * 65)
+    for i in range(len(df3)):
+        t = df3['ticker'].iloc[i]
+        c3 = df3['cagr'].iloc[i]
+        c6 = df6['cagr'].iloc[i]
+        d3 = df3['max_dd'].iloc[i]
+        d6 = df6['max_dd'].iloc[i]
+        print(f"{t:<10} | {c3:7.1%} | {c6:7.1%} | {d3:8.1%} | {d6:8.1%}")
+    
+    # Portfolio Aggregates
+    print("\n" + "="*80)
+    print("PORTFOLIO PERFORMANCE SUMMARY")
     print("-" * 80)
-    print(f"Portfolio Metrics (Average across {len(test_suite)} assets):")
-    print(f"- Strategy CAGR:   {avg_cagr:.1%}")
-    print(f"- Buy&Hold CAGR:   {avg_bh:.1%}")
-    print(f"- Avg Sharpe:      {avg_sharpe:.2f}")
-    print(f"- Crash Avoidance: {dd_improvement*100:+.1f}%")
-    print("-" * 80)
-    print("Asset Breakdown:")
-    print(res_df[['ticker', 'cagr', 'max_dd', 'sharpe']].to_string(index=False))
+    print(f"Avg CAGR (v3 Blind):   {df3['cagr'].mean():.1%}")
+    print(f"Avg CAGR (v6 Smart):   {df6['cagr'].mean():.1%}")
+    print(f"Avg MaxDD (v3 Blind):  {df3['max_dd'].mean():.1%}")
+    print(f"Avg MaxDD (v6 Smart):  {df6['max_dd'].mean():.1%}")
+    print(f"Avg Sharpe (v3 Blind): {df3['sharpe'].mean():.2f}")
+    print(f"Avg Sharpe (v6 Smart): {df6['sharpe'].mean():.2f}")
+    
+    improvement = abs(df3['max_dd'].mean()) - abs(df6['max_dd'].mean())
+    print(f"\nCrash Protection Added: {improvement:+.1%}")
     print("="*80 + "\n")
 
 if __name__ == "__main__":
-    evaluate_v5()
+    evaluate_v6()

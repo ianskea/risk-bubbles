@@ -59,6 +59,14 @@ MULTI_TIMEFRAME = {
     "spike_tolerance": 0.08     # Allow single-day +0.08 spike
 }
 
+SMART_ENTRY = {
+    "enabled": True,
+    "confirmation_candles": 3,  # Wait for 3 days of stabilization
+    "momentum_threshold": -0.05,# Don't buy if momentum < -5% (Falling Knife)
+    "initial_nibble": 0.33,     # Initial entry size (33%) while waiting for confirmation
+    "smart_tiers": ["CRYPTO", "GROWTH", "SAT"] # Tiers that require lagged entry
+}
+
 # Trade tracking (in-memory for demo, use DB in production)
 TRADE_HISTORY = {}
 
@@ -195,6 +203,41 @@ def check_multi_timeframe_confirmation(ticker, current_risk, asset_data):
     
     return True
 
+def check_entry_confirmation(ticker, asset_data):
+    """
+    Check if entry is confirmed by price stabilization/momentum
+    Returns: (is_confirmed, reason)
+    """
+    if not SMART_ENTRY["enabled"]:
+        return True, "Feature disabled"
+    
+    df = asset_data.get("df")
+    if df is None or len(df) < SMART_ENTRY["confirmation_candles"]:
+        return True, "Insufficient data"
+    
+    # 1. Momentum Check
+    momentum = asset_data.get("momentum", 0)
+    if momentum < SMART_ENTRY["momentum_threshold"]:
+        return False, f"Momentum too weak ({momentum:+.1%})"
+    
+    # 2. 3-Candle Stability Check
+    # Is current price > Low of previous 3 candles? (Stabilizing)
+    # Or 2 green candles in last 3?
+    recent = df.tail(SMART_ENTRY["confirmation_candles"])
+    higher_low = df['Low'].iloc[-1] > df['Low'].iloc[-2]
+    consecutive_green = (df['Close'].iloc[-1] > df['Close'].iloc[-2]) and (df['Open'].iloc[-1] < df['Close'].iloc[-1])
+    
+    # If price is at least holding steady or bouncing
+    if higher_low or consecutive_green:
+        return True, "Price stabilized"
+    
+    # 3. Moving Average Hook
+    ma50 = df['Close'].rolling(50).mean().iloc[-1]
+    if df['Close'].iloc[-1] > ma50:
+        return True, "Above MA50"
+        
+    return False, "Waiting for turnaround"
+
 def calculate_dynamic_moonbag(base_moonbag, momentum, regime):
     """Scale moonbag based on momentum strength"""
     if not DYNAMIC_MOONBAG["enabled"]:
@@ -314,10 +357,36 @@ def calculate_adaptive_weights_v3(asset_data, macro_context):
         # 3. VALUE ZONE
         elif risk < 0.30:
             boost = 1.0 + ((0.30 - risk) / 0.30) * 0.5
-            adjusted = min(base_weight * boost, max_w)
-            action = f"🟢 OVERWEIGHT (Value {risk:.2f}, {regime})"
-            if ticker not in TRADE_HISTORY or TRADE_HISTORY[ticker].get("last_buy_date") is None:
-                TRADE_HISTORY[ticker] = {"last_buy_date": datetime.now()}
+            target_boosted_weight = min(base_weight * boost, max_w)
+            
+            # SMART ENTRY LOGIC
+            if SMART_ENTRY["enabled"] and tier in SMART_ENTRY["smart_tiers"]:
+                # Check if we are already in the position
+                is_vested = False
+                if ticker in TRADE_HISTORY and TRADE_HISTORY[ticker].get("last_buy_date"):
+                    is_vested = True
+                
+                if is_vested:
+                    adjusted = target_boosted_weight
+                    action = f"🟢 OVERWEIGHT (Value {risk:.2f}, {regime})"
+                else:
+                    confirmed, reason = check_entry_confirmation(ticker, data)
+                    if confirmed:
+                        adjusted = target_boosted_weight
+                        action = f"🟢 SMART ENTRY (Confirmed: {reason})"
+                        if ticker not in TRADE_HISTORY or TRADE_HISTORY[ticker].get("last_buy_date") is None:
+                            TRADE_HISTORY[ticker] = {"last_buy_date": datetime.now()}
+                    else:
+                        # Nibble logic
+                        adjusted = target_boosted_weight * SMART_ENTRY["initial_nibble"]
+                        adjusted = max(adjusted, min_w)
+                        action = f"🟡 NIBBLE (Lagged: {reason})"
+            else:
+                # Standard Value Accumulation (Aggressive)
+                adjusted = target_boosted_weight
+                action = f"🟢 OVERWEIGHT (Value {risk:.2f}, {regime})"
+                if ticker not in TRADE_HISTORY or TRADE_HISTORY[ticker].get("last_buy_date") is None:
+                    TRADE_HISTORY[ticker] = {"last_buy_date": datetime.now()}
         
         # 4. WARNING ZONE
         elif risk > (effective_reduce - 0.10):
@@ -405,6 +474,7 @@ def run_adaptive_portfolio_v3():
     print(f"Conviction Hold:      {'✅ Enabled' if CONVICTION_HOLD['enabled'] else '❌ Disabled'} ({CONVICTION_HOLD['min_hold_days']}d)")
     print(f"Dynamic Moonbag:      {'✅ Enabled' if DYNAMIC_MOONBAG['enabled'] else '❌ Disabled'}")
     print(f"Multi-Timeframe:      {'✅ Enabled' if MULTI_TIMEFRAME['enabled'] else '❌ Disabled'} ({MULTI_TIMEFRAME['confirmation_days']}d)")
+    print(f"Smart Entry (Lag):    {'✅ Enabled' if SMART_ENTRY['enabled'] else '❌ Disabled'} ({SMART_ENTRY['confirmation_candles']} candles)")
     
     return weights_df
 

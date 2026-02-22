@@ -14,7 +14,7 @@ SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASS = os.getenv("SMTP_PASS")
-TO_EMAIL = "me@ianskea.com"
+TO_EMAIL = os.getenv("TO_EMAIL", "me@ianskea.com")
 
 REPORT_PATH = "output/institutional_analysis_report.txt"
 

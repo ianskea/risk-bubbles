@@ -27,7 +27,7 @@ def fetch_data(ticker: str, period: str = "max") -> pd.DataFrame:
         close_key = 'close' if 'close' in cols else 'adj close' if 'adj close' in cols else None
         if close_key:
             rename[cols[close_key]] = 'Close'
-        for key in ['high', 'low', 'volume']:
+        for key in ['open', 'high', 'low', 'volume']:
             if key in cols:
                 rename[cols[key]] = key.capitalize()
         data = data.rename(columns=rename)
@@ -36,13 +36,14 @@ def fetch_data(ticker: str, period: str = "max") -> pd.DataFrame:
             raise ValueError(f"Could not locate Close column in data. Columns found: {data.columns}")
 
         # Ensure required fields exist; allow Volume to be missing (fallback handled later)
-        for required in ['High', 'Low']:
+        for required in ['Open', 'High', 'Low']:
             if required not in data.columns:
                 data[required] = data['Close']
         if 'Volume' not in data.columns:
             data['Volume'] = np.nan
-
-        data = data[['Close', 'High', 'Low', 'Volume']].dropna(subset=['Close'])
+        
+        cols_to_keep = [c for c in ['Close', 'Open', 'High', 'Low', 'Volume'] if c in data.columns]
+        data = data[cols_to_keep].dropna(subset=['Close'])
         return data
     except Exception as e:
         raise ValueError(f"Error fetching data for {ticker}: {e}")
