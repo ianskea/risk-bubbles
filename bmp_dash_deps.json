@@ -1,0 +1,56 @@
+[
+  {
+    "clientside_function": null,
+    "inputs": [
+      {
+        "id": "url",
+        "property": "pathname"
+      },
+      {
+        "id": "display",
+        "property": "children"
+      }
+    ],
+    "long": null,
+    "output": "chart.figure",
+    "prevent_initial_call": false,
+    "state": []
+  },
+  {
+    "clientside_function": {
+      "function_name": "bc22c26e3894e4187b0ffbff9b2bcd01",
+      "namespace": "_dashprivate_clientside_funcs"
+    },
+    "inputs": [
+      {
+        "id": "ss-trigger",
+        "property": "n_clicks"
+      }
+    ],
+    "long": null,
+    "output": "ss-hidden.children",
+    "prevent_initial_call": false,
+    "state": []
+  },
+  {
+    "clientside_function": {
+      "function_name": "3e08b8b04079ccae7e09c1667c9e6142",
+      "namespace": "_dashprivate_clientside_funcs"
+    },
+    "inputs": [
+      {
+        "id": "breakpoints",
+        "property": "widthBreakpoint"
+      }
+    ],
+    "long": null,
+    "output": "display.children",
+    "prevent_initial_call": false,
+    "state": [
+      {
+        "id": "breakpoints",
+        "property": "width"
+      }
+    ]
+  }
+]

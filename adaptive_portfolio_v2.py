@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 from enhanced_risk_analyzer import analyze_asset
 from enhanced_main import analyze_market_cycle
+from vision_scraper import get_mvrv_via_vision
 
 # =====================================================
 # CONFIGURATION V2: ASSET-SPECIFIC RISK TOLERANCE
@@ -63,11 +64,20 @@ def get_risk_data_with_momentum():
     print("Fetching risk + momentum data...")
     risk_data = {}
     momentum_data = {}
+    onchain_data = {}
+    
+    # We only need to fetch MVRV vision data once per run since it's macro
+    mvrv_vision_data = get_mvrv_via_vision()
+    if mvrv_vision_data:
+        print(f"\n🧠 [AI Vision Analysis] Parsed MVRV Z-Score Tooltip:")
+        print(f"   Date:    {mvrv_vision_data.get('date', 'Unknown')}")
+        print(f"   Z-Score: {mvrv_vision_data.get('mvrv_zscore', 'Unknown')} (In Green Zone: {mvrv_vision_data.get('in_green_zone', False)})\n")
     
     for ticker in ASSET_CONFIG.keys():
         if ticker == "CASH":
             risk_data[ticker] = 0.0
             momentum_data[ticker] = 0.0
+            onchain_data[ticker] = None
             continue
             
         try:
@@ -76,18 +86,27 @@ def get_risk_data_with_momentum():
                 print(f"  ⚠️  {ticker}: {meta['reason']}")
                 risk_data[ticker] = None
                 momentum_data[ticker] = None
+                onchain_data[ticker] = None
             else:
                 risk_data[ticker] = meta['last_risk']
                 momentum_data[ticker] = calculate_momentum_score(df)
+                
+                # Fetch onchain data if crypto
+                if ASSET_CONFIG[ticker][1] == "CRYPTO":
+                    onchain_data[ticker] = mvrv_vision_data
+                else:
+                    onchain_data[ticker] = None
+                    
                 print(f"  ✓ {ticker}: Risk={meta['last_risk']:.2f}, Momentum={momentum_data[ticker]:+.1%}")
         except Exception as e:
             print(f"  ✗ {ticker}: Error - {e}")
             risk_data[ticker] = None
             momentum_data[ticker] = None
+            onchain_data[ticker] = None
     
-    return risk_data, momentum_data
+    return risk_data, momentum_data, onchain_data
 
-def calculate_adaptive_weights_v2(risk_data, momentum_data, macro_context):
+def calculate_adaptive_weights_v2(risk_data, momentum_data, onchain_data, macro_context):
     """
     V2: Asset-specific risk bands + momentum override
     """
@@ -112,6 +131,7 @@ def calculate_adaptive_weights_v2(risk_data, momentum_data, macro_context):
     for ticker, (base_weight, tier, min_w, max_w, risk_exit, risk_reduce, moonbag) in ASSET_CONFIG.items():
         risk_score = risk_data.get(ticker)
         momentum = momentum_data.get(ticker, 0.0)
+        onchain = onchain_data.get(ticker)
         
         # Skip if unavailable
         if risk_score is None:
@@ -139,8 +159,25 @@ def calculate_adaptive_weights_v2(risk_data, momentum_data, macro_context):
         adjusted = base_weight
         action = "HOLD"
         
+        # 0. GENERATIONAL BUY: MVRV In Green Zone (Z-Score < 0 or visibly in green band)
+        # We also check the date to ensure the AI didn't scrape a stale chart point
+        if onchain and onchain.get('mvrv_zscore') is not None:
+            z_score = onchain['mvrv_zscore']
+            in_green = onchain.get('in_green_zone', False)
+            date_str = onchain.get('date', 'Unknown Date')
+            
+            # If we are either physically in the green zone OR the z_score is low enough (< 0.5)
+            if in_green or z_score < 0.5:
+                # Target max exposure
+                adjusted = max_w
+                action = f"🟣 GENERATIONAL BUY (MVRV Z-Score: {z_score} | {date_str})"
+            else:
+                 # It's good to add a note to HOLD/WAIT
+                 if tier == "CRYPTO" and action == "HOLD":
+                     action = f"HOLD (Waiting for MVRV Green Zone. Current Z={z_score})"
+                
         # 1. FULL EXIT: Risk > exit threshold
-        if risk_score > effective_exit:
+        elif risk_score > effective_exit:
             adjusted = min_w
             action = f"🔴 EXIT (Risk {risk_score:.2f} > {effective_exit:.2f}){momentum_flag}"
         
@@ -233,11 +270,11 @@ def run_adaptive_portfolio_v2():
     cycle_report, macro_context = analyze_market_cycle()
     print(cycle_report)
     
-    # 2. Get Risk + Momentum
-    risk_data, momentum_data = get_risk_data_with_momentum()
+    # 2. Get Risk + Momentum + Onchain
+    risk_data, momentum_data, onchain_data = get_risk_data_with_momentum()
     
     # 3. Calculate Adaptive Weights V2
-    weights_df = calculate_adaptive_weights_v2(risk_data, momentum_data, macro_context)
+    weights_df = calculate_adaptive_weights_v2(risk_data, momentum_data, onchain_data, macro_context)
     
     # 4. Display
     print("\n" + "="*60)

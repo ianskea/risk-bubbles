@@ -1,0 +1,333 @@
+{
+  "url_base_pathname": "/django_plotly_dash/app/mvrv_zscore/",
+  "requests_pathname_prefix": "/django_plotly_dash/app/mvrv_zscore/",
+  "ui": false,
+  "props_check": false,
+  "show_undo_redo": false,
+  "suppress_callback_exceptions": false,
+  "update_title": "Updating...",
+  "children_props": {
+    "dash_core_components": {
+      "Checklist": [
+        "options[].label"
+      ],
+      "Clipboard": [],
+      "ConfirmDialog": [],
+      "ConfirmDialogProvider": [],
+      "DatePickerRange": [],
+      "DatePickerSingle": [],
+      "Download": [],
+      "Dropdown": [
+        "options[].label"
+      ],
+      "Geolocation": [],
+      "Graph": [],
+      "Input": [],
+      "Interval": [],
+      "Link": [],
+      "Loading": [],
+      "Location": [],
+      "LogoutButton": [],
+      "Markdown": [],
+      "RadioItems": [
+        "options[].label"
+      ],
+      "RangeSlider": [],
+      "Slider": [],
+      "Store": [],
+      "Tab": [],
+      "Tabs": [],
+      "Textarea": [],
+      "Tooltip": [],
+      "Upload": []
+    },
+    "dash_html_components": {
+      "A": [],
+      "Abbr": [],
+      "Acronym": [],
+      "Address": [],
+      "Area": [],
+      "Article": [],
+      "Aside": [],
+      "Audio": [],
+      "B": [],
+      "Base": [],
+      "Basefont": [],
+      "Bdi": [],
+      "Bdo": [],
+      "Big": [],
+      "Blink": [],
+      "Blockquote": [],
+      "Br": [],
+      "Button": [],
+      "Canvas": [],
+      "Caption": [],
+      "Center": [],
+      "Cite": [],
+      "Code": [],
+      "Col": [],
+      "Colgroup": [],
+      "Content": [],
+      "Data": [],
+      "Datalist": [],
+      "Dd": [],
+      "Del": [],
+      "Details": [],
+      "Dfn": [],
+      "Dialog": [],
+      "Div": [],
+      "Dl": [],
+      "Dt": [],
+      "Em": [],
+      "Embed": [],
+      "Fieldset": [],
+      "Figcaption": [],
+      "Figure": [],
+      "Font": [],
+      "Footer": [],
+      "Form": [],
+      "Frame": [],
+      "Frameset": [],
+      "H1": [],
+      "H2": [],
+      "H3": [],
+      "H4": [],
+      "H5": [],
+      "H6": [],
+      "Header": [],
+      "Hgroup": [],
+      "Hr": [],
+      "I": [],
+      "Iframe": [],
+      "Img": [],
+      "Ins": [],
+      "Kbd": [],
+      "Keygen": [],
+      "Label": [],
+      "Legend": [],
+      "Li": [],
+      "Link": [],
+      "Main": [],
+      "MapEl": [],
+      "Mark": [],
+      "Marquee": [],
+      "Meta": [],
+      "Meter": [],
+      "Nav": [],
+      "Nobr": [],
+      "Noscript": [],
+      "ObjectEl": [],
+      "Ol": [],
+      "Optgroup": [],
+      "Option": [],
+      "Output": [],
+      "P": [],
+      "Param": [],
+      "Picture": [],
+      "Plaintext": [],
+      "Pre": [],
+      "Progress": [],
+      "Q": [],
+      "Rb": [],
+      "Rp": [],
+      "Rt": [],
+      "Rtc": [],
+      "Ruby": [],
+      "S": [],
+      "Samp": [],
+      "Script": [],
+      "Section": [],
+      "Select": [],
+      "Shadow": [],
+      "Slot": [],
+      "Small": [],
+      "Source": [],
+      "Spacer": [],
+      "Span": [],
+      "Strike": [],
+      "Strong": [],
+      "Sub": [],
+      "Summary": [],
+      "Sup": [],
+      "Table": [],
+      "Tbody": [],
+      "Td": [],
+      "Template": [],
+      "Textarea": [],
+      "Tfoot": [],
+      "Th": [],
+      "Thead": [],
+      "Time": [],
+      "Title": [],
+      "Tr": [],
+      "Track": [],
+      "U": [],
+      "Ul": [],
+      "Var": [],
+      "Video": [],
+      "Wbr": [],
+      "Xmp": []
+    },
+    "dash_table": {
+      "DataTable": []
+    },
+    "dash_breakpoints": {
+      "WindowBreakpoints": []
+    },
+    "dash_bootstrap_components": {
+      "Accordion": [],
+      "AccordionItem": [],
+      "Alert": [],
+      "Badge": [],
+      "Breadcrumb": [],
+      "Button": [],
+      "ButtonGroup": [],
+      "Card": [],
+      "CardBody": [],
+      "CardFooter": [],
+      "CardGroup": [],
+      "CardHeader": [],
+      "CardImg": [],
+      "CardImgOverlay": [],
+      "CardLink": [],
+      "Carousel": [],
+      "Collapse": [],
+      "DropdownMenu": [
+        "label"
+      ],
+      "DropdownMenuItem": [],
+      "Fade": [],
+      "Form": [],
+      "FormFeedback": [],
+      "FormFloating": [],
+      "FormText": [],
+      "Label": [],
+      "Checkbox": [
+        "label"
+      ],
+      "Checklist": [
+        "options[].label"
+      ],
+      "Input": [],
+      "InputGroup": [],
+      "InputGroupText": [],
+      "RadioButton": [
+        "label"
+      ],
+      "RadioItems": [
+        "options[].label"
+      ],
+      "Select": [],
+      "Switch": [
+        "label"
+      ],
+      "Textarea": [],
+      "Col": [],
+      "Container": [],
+      "Row": [],
+      "Stack": [],
+      "ListGroup": [],
+      "ListGroupItem": [],
+      "Modal": [],
+      "ModalBody": [],
+      "ModalFooter": [],
+      "ModalHeader": [],
+      "ModalTitle": [],
+      "Nav": [],
+      "NavItem": [],
+      "NavLink": [],
+      "Navbar": [],
+      "NavbarBrand": [],
+      "NavbarSimple": [
+        "brand"
+      ],
+      "NavbarToggler": [],
+      "Offcanvas": [
+        "title"
+      ],
+      "Pagination": [],
+      "Placeholder": [],
+      "Popover": [],
+      "PopoverBody": [],
+      "PopoverHeader": [],
+      "Progress": [],
+      "Spinner": [],
+      "Table": [],
+      "Tab": [],
+      "Tabs": [],
+      "Toast": [
+        "header"
+      ],
+      "Tooltip": []
+    }
+  },
+  "validation_layout": {
+    "props": {
+      "children": [
+        {
+          "props": {
+            "id": "url"
+          },
+          "type": "Location",
+          "namespace": "dash_core_components"
+        },
+        {
+          "props": {
+            "children": null,
+            "id": "display"
+          },
+          "type": "Div",
+          "namespace": "dash_html_components"
+        },
+        {
+          "props": {
+            "id": "breakpoints"
+          },
+          "type": "WindowBreakpoints",
+          "namespace": "dash_breakpoints"
+        },
+        {
+          "props": {
+            "children": null,
+            "id": "loading-1"
+          },
+          "type": "Loading",
+          "namespace": "dash_core_components"
+        },
+        {
+          "props": {
+            "children": null,
+            "id": "ss-hidden"
+          },
+          "type": "Div",
+          "namespace": "dash_html_components"
+        },
+        {
+          "props": {
+            "children": null,
+            "id": "menubar"
+          },
+          "type": "Div",
+          "namespace": "dash_html_components"
+        },
+        {
+          "props": {
+            "children": null,
+            "id": "ss-trigger"
+          },
+          "type": "Button",
+          "namespace": "dash_html_components"
+        },
+        {
+          "props": {
+            "id": "chart"
+          },
+          "type": "Graph",
+          "namespace": "dash_core_components"
+        }
+      ]
+    },
+    "type": "Div",
+    "namespace": "dash_html_components"
+  }
+}

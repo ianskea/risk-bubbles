@@ -1,0 +1,147 @@
+{
+  "props": {
+    "children": [
+      {
+        "props": {
+          "id": "url"
+        },
+        "type": "Location",
+        "namespace": "dash_core_components"
+      },
+      {
+        "props": {
+          "children": null,
+          "id": "display",
+          "className": "d-none"
+        },
+        "type": "Div",
+        "namespace": "dash_html_components"
+      },
+      {
+        "props": {
+          "id": "breakpoints",
+          "widthBreakpointNames": [
+            "xs",
+            "sm",
+            "md",
+            "lg",
+            "xl",
+            "xxl"
+          ],
+          "widthBreakpointThresholdsPx": [
+            576,
+            768,
+            992,
+            1200,
+            1400
+          ]
+        },
+        "type": "WindowBreakpoints",
+        "namespace": "dash_breakpoints"
+      },
+      {
+        "props": {
+          "children": [
+            {
+              "props": {
+                "children": null,
+                "id": "ss-hidden",
+                "style": {
+                  "display": "none"
+                }
+              },
+              "type": "Div",
+              "namespace": "dash_html_components"
+            },
+            {
+              "props": {
+                "children": [
+                  {
+                    "props": {
+                      "children": [],
+                      "className": "menubar-left-col d-flex justify-content-start align-items-center"
+                    },
+                    "type": "Div",
+                    "namespace": "dash_html_components"
+                  },
+                  {
+                    "props": {
+                      "children": [
+                        {
+                          "props": {
+                            "children": [
+                              {
+                                "props": {
+                                  "children": [
+                                    ""
+                                  ],
+                                  "className": "menu-header-item"
+                                },
+                                "type": "Label",
+                                "namespace": "dash_html_components"
+                              },
+                              {
+                                "props": {
+                                  "children": [
+                                    {
+                                      "props": {
+                                        "children": [
+                                          "camera_alt"
+                                        ],
+                                        "className": "material-icons",
+                                        "style": {
+                                          "font-size": "1.4rem"
+                                        }
+                                      },
+                                      "type": "I",
+                                      "namespace": "dash_html_components"
+                                    }
+                                  ],
+                                  "id": "ss-trigger",
+                                  "className": "btn"
+                                },
+                                "type": "Button",
+                                "namespace": "dash_html_components"
+                              }
+                            ],
+                            "className": "menubar-item-container d-flex flex-column"
+                          },
+                          "type": "Div",
+                          "namespace": "dash_html_components"
+                        }
+                      ],
+                      "className": "menubar-right-col d-flex justify-content-end align-items-center"
+                    },
+                    "type": "Div",
+                    "namespace": "dash_html_components"
+                  }
+                ],
+                "id": "menubar",
+                "className": "menubar justify-content-between align-items-center"
+              },
+              "type": "Div",
+              "namespace": "dash_html_components"
+            },
+            {
+              "props": {
+                "id": "chart",
+                "config": {
+                  "displayModeBar": false,
+                  "displaylogo": false
+                }
+              },
+              "type": "Graph",
+              "namespace": "dash_core_components"
+            }
+          ],
+          "id": "loading-1",
+          "color": "#3C75D5"
+        },
+        "type": "Loading",
+        "namespace": "dash_core_components"
+      }
+    ]
+  },
+  "type": "Div",
+  "namespace": "dash_html_components"
+}
