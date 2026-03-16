@@ -12,6 +12,7 @@ import pandas as pd
 from enhanced_risk_analyzer import analyze_asset
 from model_validation import validate_model
 from sentiment_analyzer import fetch_crypto_sentiment, get_sentiment_advice
+from santiment_api import fetch_santiment_summary
 
 # Load Environment Variables
 load_dotenv()
@@ -70,9 +71,9 @@ CHART_DIR = os.path.join(OUTPUT_DIR, "charts")
 LOG_DIR = "logs"
 
 def ensure_dirs():
-    if not os.path.exists(OUTPUT_DIR): os.makedirs(OUTPUT_DIR)
-    if not os.path.exists(CHART_DIR): os.makedirs(CHART_DIR)
-    if not os.path.exists(LOG_DIR): os.makedirs(LOG_DIR)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(CHART_DIR, exist_ok=True)
+    os.makedirs(LOG_DIR, exist_ok=True)
 
 def setup_logging():
     log_file = os.path.join(LOG_DIR, "institutional_analysis.log")
@@ -190,6 +191,7 @@ def generate_ai_analysis(ticker, price, risk, metrics, meta):
     - Drawdown: Current {dd_cur}, Max {dd_max}
     - Model Validation Score: {metrics.get('score', 0)}/100
     - On-Chain Floors: {meta.get('on_chain_floors', 'N/A')}
+    - Santiment Intelligence (31d Lag): {meta.get('santiment_summary', 'N/A')}
 
     Structure your response clearly:
     1. **Institutional Action Bias**: (Must align with Interpretation Rules above)
@@ -208,8 +210,8 @@ def generate_ai_analysis(ticker, price, risk, metrics, meta):
             response = client.chat.completions.create(
                 model="deepseek-chat",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=500,
-                timeout=30
+                max_tokens=1500,
+                timeout=45
             )
             return response.choices[0].message.content.strip()
             
@@ -366,6 +368,12 @@ def main():
             # Inject On-Chain Floors for BTC
             if ticker == "BTC-USD":
                 asset_data["meta"]["on_chain_floors"] = BTC_ON_CHAIN_FLOORS
+            
+            # [NEW] Inject Santiment Data for Crypto
+            if "USD" in ticker:
+                print(f"  > Fetching Santiment Intelligence for {name}...")
+                santiment_data = fetch_santiment_summary(name)
+                asset_data["meta"]["santiment_summary"] = santiment_data
                 
             plot_comprehensive_analysis(name, ticker, df)
             
@@ -429,6 +437,13 @@ Validation Score: {asset['score']}/100
             floors = meta.get("on_chain_floors", {})
             floor_text = " | ".join([f"{k}: ${v:,}" for k, v in floors.items()])
             section += f"On-Chain Floors: {floor_text}\n"
+            
+        # [NEW] Santiment Context
+        sant_sum = meta.get("santiment_summary", {})
+        if sant_sum and "error" not in sant_sum:
+            mvrv_val = sant_sum.get('mvrv_usd_365d')
+            mvrv_str = f"{float(mvrv_val):.2f}" if mvrv_val is not None else "N/A"
+            section += f"Santiment (31d Lag): MVRV {mvrv_str} ({sant_sum.get('mvrv_status', 'N/A')}) | Sentiment: {sant_sum.get('sentiment_status', 'N/A')}\n"
             
         section += f"Context: {context_line}\n"
 
