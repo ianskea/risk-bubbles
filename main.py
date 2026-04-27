@@ -37,6 +37,7 @@ TICKERS = {
     # ASX - Financials / Other
     "Macquarie Group": "MQG.AX",
     "SiteMinder": "SDR.AX",
+    "Telstra": "TLS.AX",
     
     # ASX - ETFs
     "Global X Semi": "SEMI.AX",
@@ -45,7 +46,13 @@ TICKERS = {
     "Global X Robots": "RBTZ.AX",
     "BetaShares Asia": "ASIA.AX",
     "Vanguard Prop": "VAP.AX",
-    "BetaShares NDQ": "NDQ.AX"
+    "BetaShares NDQ": "NDQ.AX",
+    "Vanguard Europe": "VEQ.AX",
+    "iShares Asia 50": "IAA.AX",
+    "Battery Tech": "ACDC.AX",
+    "Global Infrastructure": "IFRA.AX",
+    "Global Healthcare": "IXJ.AX",
+    "Global Energy": "FUEL.AX"
 }
 
 OUTPUT_DIR = "output"
