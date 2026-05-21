@@ -280,6 +280,8 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     total_weight = sum(weights.values())
     df['risk_total'] = sum(_safe_factor(name) * (weight / total_weight) for name, weight in weights.items())
 
+    df['sma_20d'] = df['Close'].rolling(window=20).mean()
+
     # Clean early NaNs in inputs without discarding full history
     df = df.dropna(subset=['risk_total'])
     
@@ -328,6 +330,7 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     metadata = {
         "ticker": ticker,
         "last_price": last_price,
+        "sma_20d": df['sma_20d'].iloc[-1],
         "last_risk": last_risk,
         "rating": "BUY" if last_risk < 0.3 else "SELL" if last_risk > 0.75 else "HOLD",
         "ma50_dist": ma50_dist,

@@ -6,10 +6,11 @@ from datetime import datetime
 # from PIL import Image # For potential future image processing
 from openai import OpenAI
 from dotenv import load_dotenv
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from enhanced_risk_analyzer import analyze_asset
+from sector_config import SECTOR_INTELLIGENCE, BTC_ON_CHAIN_FLOORS, LAST_UPDATED
+from charting import plot_comprehensive_analysis
 from model_validation import validate_model
 from sentiment_analyzer import fetch_crypto_sentiment, get_sentiment_advice
 from santiment_api import fetch_santiment_summary
@@ -25,53 +26,6 @@ if DEEPSEEK_API_KEY:
         client = None
 else:
     client = None
-
-TICKERS = {
-    # Crypto
-    "Bitcoin": "BTC-USD",
-    "Ethereum": "ETH-USD",
-    "Cardano": "ADA-USD",
-    
-    # Commodities
-    "Gold": "GC=F",
-    "Silver": "SI=F",
-    
-    # ASX - Miners / Resources
-    "BHP Group": "BHP.AX",
-    "Rio Tinto": "RIO.AX",
-    "Fortescue": "FMG.AX",
-    "Mineral Resources": "MIN.AX",
-    "Pilbara Minerals": "PLS.AX",
-    "South32": "S32.AX",
-    "IGO Ltd": "IGO.AX",
-    
-    # ASX - Financials / Other
-    "Macquarie Group": "MQG.AX",
-    "SiteMinder": "SDR.AX",
-    "Telstra": "TLS.AX",
-    
-    # ASX - ETFs
-    "Global X Semi": "SEMI.AX",
-    "Global X FANG+": "FANG.AX",
-    "BetaShares Mining Resources": "QRE.AX",
-    "Global X Robots": "RBTZ.AX",
-    "BetaShares Asia": "ASIA.AX",
-    "Vanguard Prop": "VAP.AX",
-    "BetaShares NDQ": "NDQ.AX",
-    "Vanguard Europe": "VEQ.AX",
-    "iShares Asia 50": "IAA.AX",
-    "Battery Tech": "ACDC.AX",
-    "Global Infrastructure": "IFRA.AX",
-    "Global Healthcare": "IXJ.AX",
-    "Global Energy": "FUEL.AX"
-}
-
-# [NEW] Bitcoin On-Chain Floors (Based on Cowen/On-Chain Research)
-# These are dynamic but updated here for current macro context.
-BTC_ON_CHAIN_FLOORS = {
-    "Realized Price": 55000,
-    "Balance Price": 40000
-}
 
 OUTPUT_DIR = "output"
 CHART_DIR = os.path.join(OUTPUT_DIR, "charts")
@@ -93,73 +47,6 @@ def setup_logging():
         ]
     )
     logging.info("Logging initialized.")
-
-def plot_comprehensive_analysis(ticker_name, ticker_symbol, df):
-    """
-    6-Panel Institutional Chart
-    """
-    fig = plt.figure(figsize=(15, 12))
-    gs = fig.add_gridspec(3, 2)
-    
-    # 1. Price + Regression Bands (Top Left)
-    ax1 = fig.add_subplot(gs[0, 0])
-    ax1.set_title(f"{ticker_name} - Price & Fair Value Models")
-    ax1.plot(df.index, df['Close'], label='Price', color='black', lw=1)
-    
-    # Needs debug info for bands? 
-    # enhanced_risk_analyzer returns just Risk Scores in main DF.
-    # We might want to expose regression bands in the future.
-    # For now, plot Simple Moving Averages as proxy for bands if not in DF?
-    # Or purely use price.
-    ax1.plot(df.index, df['Close'].rolling(200).mean(), label='200 SMA', color='orange', ls='--')
-    ax1.set_yscale('log')
-    ax1.legend()
-    ax1.grid(True, alpha=0.2)
-    
-    # 2. Composite Risk (Top Right)
-    ax2 = fig.add_subplot(gs[0, 1])
-    ax2.set_title("Composite Risk Score (0-1)")
-    ax2.plot(df.index, df['risk_total'], color='blue', lw=1.5)
-    ax2.axhline(0.7, color='red', ls='--', alpha=0.5)
-    ax2.axhline(0.3, color='green', ls='--', alpha=0.5)
-    ax2.fill_between(df.index, 0.7, 1.0, color='red', alpha=0.1)
-    ax2.fill_between(df.index, 0.0, 0.3, color='green', alpha=0.1)
-    ax2.grid(True, alpha=0.2)
-    
-    # 3. Valuation Risk (Mid Left)
-    ax3 = fig.add_subplot(gs[1, 0])
-    ax3.set_title("Factor: Valuation Risk")
-    ax3.plot(df.index, df.get('risk_valuation', df['risk_total']), color='purple', lw=1)
-    ax3.grid(True, alpha=0.2)
-    
-    # 4. Momentum Risk/RSI (Mid Right)
-    ax4 = fig.add_subplot(gs[1, 1])
-    ax4.set_title("Factor: Momentum (RSI)")
-    ax4.plot(df.index, df.get('rsi', [50]*len(df)), color='orange', lw=1)
-    ax4.axhline(70, color='red', ls=':')
-    ax4.axhline(30, color='green', ls=':')
-    ax4.grid(True, alpha=0.2)
-    
-    # 5. Volatility Risk (Bot Left)
-    ax5 = fig.add_subplot(gs[2, 0])
-    ax5.set_title("Factor: Volatility Risk")
-    ax5.plot(df.index, df.get('risk_volatility', [0.5]*len(df)), color='gray', lw=1)
-    ax5.grid(True, alpha=0.2)
-    
-    # 6. Returns Distribution? Or Validation?
-    # Let's show Recent 1-Year Performance vs Risk
-    ax6 = fig.add_subplot(gs[2, 1])
-    ax6.text(0.1, 0.5, "Detailed Validation Metrics\nSee Report", fontsize=12)
-    ax6.axis('off')
-
-    plt.tight_layout()
-    path = os.path.join(CHART_DIR, f"{ticker_symbol}_comprehensive.png")
-    try:
-        plt.savefig(path)
-    except Exception as e:
-        logging.error(f"Error generating chart for {ticker_name}: {e}")
-    plt.close()
-    return path
 
 def generate_ai_analysis(ticker, price, risk, metrics, meta):
     if not client:
@@ -183,6 +70,7 @@ def generate_ai_analysis(ticker, price, risk, metrics, meta):
     Current Price: ${price:.2f}
     Composite Risk Score: {risk:.2f} (0.0 = Buy/Value, 1.0 = Sell/Bubble)
     Gone Home Status: {meta.get('gone_home', 'N/A')}
+    Sector Context: {meta.get('sector_context', 'General Asset')}
     
     Interpretation Rules (v2.0 Asymmetric):
     - Value Zone (< 0.30): Institutional Accumulation (Buy).
@@ -325,83 +213,106 @@ def main():
     
     print("\n--- Processing Assets ---")
     
-    for name, ticker in TICKERS.items():
-        print(f"Analyzing {name} ({ticker})...")
-        try:
-            df, _, meta = analyze_asset(ticker)
-            if meta.get("reason"):
-                invalid_assets.append({
-                    "name": name,
-                    "ticker": ticker,
-                    "reason": meta["reason"]
-                })
-                continue
-            if df.empty:
-                invalid_assets.append({
-                    "name": name,
-                    "ticker": ticker,
-                    "reason": "No data returned"
-                })
-                continue
-            
-            # Run Validation
-            val_metrics = validate_model(df)
-            score = val_metrics.get('score', 0)
-            if val_metrics.get("error"):
-                invalid_assets.append({
-                    "name": name,
-                    "ticker": ticker,
-                    "reason": val_metrics["error"]
-                })
-                continue
-            
-            # --- INSTITUTIONAL HARD GATE ---
-            # Score < 60: FAIL. NO SIGNAL.
-            # Score >= 60: PASS. Actionable.
-            
-            is_valid = score >= 60
+    for sector_name, sector_data in SECTOR_INTELLIGENCE.items():
+        print(f"\n--- Processing Sector: {sector_name} ---")
+        exit_t = sector_data.get("danger_zone_threshold", 0.8)
+        fetch_santiment = sector_data.get("fetch_santiment", False)
+        
+        for name, ticker in sector_data["assets"].items():
+            print(f"Analyzing {name} ({ticker})...")
+            try:
+                df, _, meta = analyze_asset(ticker)
+                if meta.get("reason"):
+                    invalid_assets.append({
+                        "name": name,
+                        "ticker": ticker,
+                        "reason": meta["reason"]
+                    })
+                    continue
+                if df.empty:
+                    invalid_assets.append({
+                        "name": name,
+                        "ticker": ticker,
+                        "reason": "No data returned"
+                    })
+                    continue
+                
+                # Run Validation
+                val_metrics = validate_model(df)
+                score = val_metrics.get('score', 0)
+                if val_metrics.get("error"):
+                    invalid_assets.append({
+                        "name": name,
+                        "ticker": ticker,
+                        "reason": val_metrics["error"]
+                    })
+                    continue
+                
+                # --- INSTITUTIONAL HARD GATE ---
+                # Score < 60: FAIL. NO SIGNAL.
+                # Score >= 60: PASS. Actionable.
+                
+                is_valid = score >= 60
 
-            # Common Data
-            asset_data = {
-                "name": name,
-                "ticker": ticker,
-                "price": round(meta['last_price'], 2),
-                "risk": round(meta['last_risk'], 2),
-                "score": score,
-                "meta": meta,
-                "val_metrics": val_metrics
-            }
-            
-            # Inject On-Chain Floors for BTC
-            if ticker == "BTC-USD":
-                asset_data["meta"]["on_chain_floors"] = BTC_ON_CHAIN_FLOORS
-            
-            # [NEW] Inject Santiment Data for Crypto
-            if "USD" in ticker:
-                print(f"  > Fetching Santiment Intelligence for {name}...")
-                santiment_data = fetch_santiment_summary(name)
-                asset_data["meta"]["santiment_summary"] = santiment_data
+                # Common Data
+                asset_data = {
+                    "name": name,
+                    "ticker": ticker,
+                    "price": round(meta['last_price'], 2),
+                    "risk": round(meta['last_risk'], 2),
+                    "score": score,
+                    "meta": meta,
+                    "val_metrics": val_metrics,
+                    "sector": sector_name,
+                    "exit_threshold": exit_t
+                }
                 
-            plot_comprehensive_analysis(name, ticker, df)
-            
-            if is_valid:
-                # Generate AI Insight only for valid
-                asset_data["ai_text"] = generate_ai_analysis(name, meta['last_price'], meta['last_risk'], val_metrics, meta)
-                valid_assets.append(asset_data)
-            else:
-                asset_data["reason"] = "Validation Failure (<60)"
-                invalid_assets.append(asset_data)
+                # Inject Sector Context
+                asset_data["meta"]["sector_context"] = sector_data.get("sector_context", "General Asset")
                 
-            time.sleep(1) # Rate limit
+                # Inject On-Chain Floors for BTC
+                if ticker == "BTC-USD":
+                    asset_data["meta"]["on_chain_floors"] = BTC_ON_CHAIN_FLOORS
+                
+                # Inject Santiment Data
+                if fetch_santiment:
+                    print(f"  > Fetching Santiment Intelligence for {name}...")
+                    santiment_data = fetch_santiment_summary(name)
+                    asset_data["meta"]["santiment_summary"] = santiment_data
+                    
+                plot_comprehensive_analysis(name, ticker, df, CHART_DIR)
+                
+                if is_valid:
+                    # Generate AI Insight only for valid
+                    asset_data["ai_text"] = generate_ai_analysis(name, meta['last_price'], meta['last_risk'], val_metrics, meta)
+                    valid_assets.append(asset_data)
+                else:
+                    asset_data["reason"] = "Validation Failure (<60)"
+                    invalid_assets.append(asset_data)
+                
+                time.sleep(1) # Rate limit
             
-        except Exception as e:
-            print(f"Error {name}: {e}")
-            import traceback
-            traceback.print_exc()
+
+            except Exception as e:
+                print(f"Error {name}: {e}")
+                import traceback
+                traceback.print_exc()
 
     # --- REPORT CONSTRUCTION ---
     full_report = f"INSTITUTIONAL RISK REPORT - {datetime.now().strftime('%Y-%m-%d')}\n"
-    full_report += "="*60 + "\n\n"
+    full_report += "="*60 + "\n"
+    
+    # Check for stale sector configuration
+    try:
+        last_updated_date = datetime.strptime(LAST_UPDATED, "%Y-%m-%d")
+        if (datetime.now() - last_updated_date).days > 30:
+            staleness_warning = "\n⚠️  WARNING: Sector Intelligence is over 30 days old. Review sector_config.py.\n"
+            print(staleness_warning)
+            full_report += staleness_warning
+    except ValueError:
+        pass
+        
+    full_report += "\n"
     
     # 1. Macro Dashboard
     full_report += cycle_text
@@ -415,12 +326,22 @@ def main():
     
     for asset in valid_assets:
         r = asset['risk']
-        
-        # Signal Logic (v2.0 Asymmetric)
-        exit_t = 0.85 if "USD" in asset['ticker'] else 0.80 if "VGS" in asset['ticker'] or "MQG" in asset['ticker'] else 0.75
-        signal_str = "🟢 [BUY]" if r < 0.3 else "🔴 [SELL]" if r > exit_t else "🟡 [HOLD]"
-
         meta = asset['meta']
+        price = asset['price']
+        sma_20d = meta.get('sma_20d', 0)
+        
+        # Signal Logic (v2.1 Momentum Stop)
+        exit_t = asset.get('exit_threshold', 0.8)
+        
+        if r < 0.3:
+            signal_str = "🟢 [BUY]"
+        elif r > exit_t:
+            if price > sma_20d:
+                signal_str = "🔥 [RIDE BUBBLE]"
+            else:
+                signal_str = "🔴 [SELL (Trend Broken)]"
+        else:
+            signal_str = "🟡 [HOLD]"
         ma_context = []
         if meta.get("ma50_dist") is not None and not pd.isna(meta.get("ma50_dist")):
             ma_context.append(f"MA50 dist: {meta['ma50_dist']*100:.1f}%")
