@@ -23,6 +23,16 @@ SECTOR_INTELLIGENCE = {
             "Cardano": "ADA-USD"
         }
     },
+    "Crypto_Rotations": {
+        "danger_zone_threshold": 0.85,
+        "fetch_santiment": False,
+        "sector_context": "Crypto cross-pairs (Capital Waterfall). Tracks liquidity rotation from BTC into ETH and Alts. High risk means the altcoin cycle is exhausted against BTC.",
+        "assets": {
+            "ETH / BTC": "ETH-BTC",
+            "ADA / BTC": "ADA-BTC",
+            "ADA / ETH": "ADA-ETH"
+        }
+    },
     "Commodities": {
         "danger_zone_threshold": 0.75,
         "fetch_santiment": False,
