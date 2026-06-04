@@ -41,7 +41,7 @@ def fetch_data(ticker: str, period: str = "max") -> pd.DataFrame:
                 data[required] = data['Close']
         if 'Volume' not in data.columns:
             data['Volume'] = np.nan
-        
+
         cols_to_keep = [c for c in ['Close', 'Open', 'High', 'Low', 'Volume'] if c in data.columns]
         data = data[cols_to_keep].dropna(subset=['Close'])
         return data
@@ -70,19 +70,19 @@ def calculate_macd(series: pd.Series, fast: int = 12, slow: int = 26, signal: in
 
 def calculate_stochastic(high, low, close, period=14, smooth_k=3):
     # Depending on input, if we only have close, we estimate
-    # For this system, we only fetch Close. 
+    # For this system, we only fetch Close.
     # Approx: Use rolling max/min of Close as proxy for High/Low if needed
-    # Better: yfinance download usually gives OHLC. 
+    # Better: yfinance download usually gives OHLC.
     # For now, let's stick to using Close for everything to keep it robust to single-column inputs,
-    # or improve fetch_data to get High/Low. 
+    # or improve fetch_data to get High/Low.
     # Let's improve fetch_data later. For now, approx with Close.
     # actually, proper risk analysis needs Volume too.
     # Let's update data fetching to get OHLCV first in a real scenario.
     # But to match existing architecture, let's keep it simple or upgrade fetch_data.
     # Given the prompt, "Institutional-Grade" implies better data.
-    # I will stick to Close-only for now to ensure compatibility with the simple fetch_data, 
+    # I will stick to Close-only for now to ensure compatibility with the simple fetch_data,
     # or just use Close for High/Low proxy (rolling max/min).
-    
+
     lowest_low = close.rolling(window=period).min()
     highest_high = close.rolling(window=period).max()
     k = 100 * ((close - lowest_low) / (highest_high - lowest_low))
@@ -96,18 +96,18 @@ def calculate_mfi(high, low, close, volume, period=14):
     """
     typical_price = (high + low + close) / 3
     money_flow = typical_price * volume
-    
+
     # Get direction
     delta = typical_price.diff()
-    
+
     # Positive/Negative Flow
     pos_flow = money_flow.where(delta > 0, 0)
     neg_flow = money_flow.where(delta < 0, 0)
-    
+
     # Sum over period
     pos_sum = pos_flow.rolling(window=period).sum()
     neg_sum = neg_flow.rolling(window=period).sum()
-    
+
     # Ratio
     mfi_ratio = pos_sum / neg_sum.replace(0, np.nan)
     mfi = 100 - (100 / (1 + mfi_ratio))
@@ -128,7 +128,11 @@ def normalize_series(s: pd.Series, lookback: int = 252, min_frac: float = 0.5) -
     min_periods = max(5, int(lookback * min_frac))
     return s.rolling(lookback, min_periods=min_periods).rank(pct=True)
 
-def calculate_valuation_risk(df: pd.DataFrame, min_periods: int = 200) -> tuple[pd.Series, pd.DataFrame]:
+def calculate_valuation_risk(
+    df: pd.DataFrame,
+    min_periods: int = 200,
+    volatility_window: int = 252
+) -> tuple[pd.Series, pd.DataFrame]:
     """
     Ensemble Regression Model (Linear + Quadratic + Adaptive)
     Returns: (Risk Score Series, Debug DataFrame)
@@ -136,68 +140,68 @@ def calculate_valuation_risk(df: pd.DataFrame, min_periods: int = 200) -> tuple[
     n = len(df)
     log_price = np.log(df['Close'])
     t = np.arange(n)
-    
+
     # Pre-allocate
     risk_ensemble = np.full(n, np.nan)
     linear_residuals = np.full(n, np.nan)
     quad_residuals = np.full(n, np.nan)
-    
+
     # We do a simplified version of the loop for speed, or full loop?
     # Full loop required for walk-forward fairness.
-    
+
     # Optimization: Use expanding windows more efficiently if possible, but python loop is clear.
     # Let's stick to the loop from risk_analyzer but expand it.
-    
+
     print("  Calculating valuation risk (ensemble)...")
-    
+
     # Arrays for predicted values
     pred_linear = np.full(n, np.nan)
     pred_quad = np.full(n, np.nan)
-    
+
     for i in range(min_periods, n):
         # Slice history
         # Speed optimization: Don't re-slice everything if not needed, but safe to do so.
         curr_t = t[:i+1]
         curr_log = log_price.values[:i+1]
-        
+
         # 1. Linear
         # fit = linregress(curr_t, curr_log) -> slow inside loop? np.polyfit is faster
         lin_coeffs = np.polyfit(curr_t, curr_log, 1)
         val_lin = np.polyval(lin_coeffs, i)
         pred_linear[i] = val_lin
-        
+
         # 2. Quadratic
         quad_coeffs = np.polyfit(curr_t, curr_log, 2)
         val_quad = np.polyval(quad_coeffs, i)
         pred_quad[i] = val_quad
-        
+
         # Residuals
         resid_lin = curr_log[i] - val_lin
         resid_quad = curr_log[i] - val_quad
-        
+
         linear_residuals[i] = resid_lin
         quad_residuals[i] = resid_quad
-        
-        # Z-Scores based on historical residuals
-        # (Using minimal 200 period history for std dev to stabilize)
-        hist_lin = linear_residuals[min_periods:i+1]
-        hist_quad = quad_residuals[min_periods:i+1]
-        
+
+        # Use prior rolling residual volatility so today's outlier does not dilute its own signal.
+        start_idx = max(min_periods, i - volatility_window)
+        hist_lin = linear_residuals[start_idx:i]
+        hist_quad = quad_residuals[start_idx:i]
+
         std_lin = np.nanstd(hist_lin) if len(hist_lin) > 10 else 1.0
         std_quad = np.nanstd(hist_quad) if len(hist_quad) > 10 else 1.0
-        
+
         z_lin = resid_lin / std_lin if std_lin > 0 else 0
         z_quad = resid_quad / std_quad if std_quad > 0 else 0
-        
+
         # 3. Probabilities
         prob_lin = norm.cdf(z_lin)
         prob_quad = norm.cdf(z_quad)
-        
+
         # Ensemble Weighting:
         # If trend is accelerating (convex), quad fits better.
         # Simple average is robust.
         risk_ensemble[i] = (prob_lin * 0.4) + (prob_quad * 0.6) # Give more weight to curve
-        
+
     debug_df = pd.DataFrame({
         'log_price': log_price,
         'pred_linear': pred_linear,
@@ -205,8 +209,85 @@ def calculate_valuation_risk(df: pd.DataFrame, min_periods: int = 200) -> tuple[
         'resid_linear': linear_residuals,
         'resid_quad': quad_residuals
     }, index=df.index)
-    
+
     return pd.Series(risk_ensemble, index=df.index), debug_df
+
+
+BENCHMARK_CACHE = {}
+
+def get_benchmark_returns(benchmark_ticker: str, start_date: pd.Timestamp, end_date: pd.Timestamp) -> pd.Series:
+    """Gets and caches benchmark log returns to avoid multiple yfinance downloads."""
+    cache_key = (benchmark_ticker, start_date.date(), end_date.date())
+    if cache_key in BENCHMARK_CACHE:
+        return BENCHMARK_CACHE[cache_key]
+
+    try:
+        print(f"Fetching benchmark {benchmark_ticker} for Beta calculation...")
+        # Download the benchmark for the same period
+        bench_data = yf.download(benchmark_ticker, start=start_date, end=end_date, progress=False, auto_adjust=True)
+        if isinstance(bench_data.columns, pd.MultiIndex):
+            # Flatten or cross-section Close
+            if 'Close' in bench_data.columns.get_level_values(0):
+                bench_data.columns = bench_data.columns.get_level_values(0)
+            else:
+                bench_data = bench_data.droplevel(0, axis=1)
+
+        # Flatten MultiIndex from yfinance if present
+        if 'Close' not in bench_data.columns:
+            # Let's try to rename close col
+            cols = {str(c).lower(): c for c in bench_data.columns}
+            close_key = 'close' if 'close' in cols else 'adj close' if 'adj close' in cols else None
+            if close_key:
+                bench_data = bench_data.rename(columns={cols[close_key]: 'Close'})
+
+        bench_close = bench_data['Close'].dropna()
+        bench_rets = np.log(bench_close / bench_close.shift(1)).dropna()
+        BENCHMARK_CACHE[cache_key] = bench_rets
+        return bench_rets
+    except Exception as e:
+        print(f"Failed to fetch benchmark {benchmark_ticker}: {e}")
+        return pd.Series()
+
+def calculate_dynamic_beta(df: pd.DataFrame, benchmark_ticker: str = "SPY", lookback: int = 90) -> pd.Series:
+    """
+    Calculates the 90-day rolling beta of the asset relative to a benchmark.
+    Returns: pd.Series of rolling beta.
+    """
+    if df.empty or len(df) < lookback:
+        return pd.Series(1.0, index=df.index)
+
+    start_date = df.index[0]
+    end_date = df.index[-1]
+
+    # Download or get from cache
+    bench_rets = get_benchmark_returns(benchmark_ticker, start_date, end_date)
+    if bench_rets.empty:
+        return pd.Series(1.0, index=df.index)
+
+    asset_rets = np.log(df['Close'] / df['Close'].shift(1)).dropna()
+
+    # Align index
+    common_idx = asset_rets.index.intersection(bench_rets.index)
+    if len(common_idx) < lookback:
+        return pd.Series(1.0, index=df.index)
+
+    a = asset_rets.loc[common_idx]
+    b = bench_rets.loc[common_idx]
+
+    # Calculate rolling covariance and variance
+    df_temp = pd.DataFrame({'a': a, 'b': b})
+    roll_cov = df_temp['a'].rolling(window=lookback, min_periods=lookback//2).cov(df_temp['b'])
+    roll_var = df_temp['b'].rolling(window=lookback, min_periods=lookback//2).var()
+
+    beta = roll_cov / roll_var.replace(0, np.nan)
+    # Fill early NaNs and forward fill
+    beta = beta.reindex(df.index).ffill().bfill().fillna(1.0)
+    return beta
+
+
+def calculate_rolling_beta(df: pd.DataFrame, benchmark_ticker: str = "SPY", lookback: int = 90) -> pd.Series:
+    """Backward-compatible wrapper for the dynamic beta calculation."""
+    return calculate_dynamic_beta(df, benchmark_ticker, lookback)
 
 
 def get_gone_home_status(risk_score: float) -> str:
@@ -244,16 +325,16 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
         return pd.DataFrame(), {}, {"ticker": ticker, "reason": "Insufficient history (<200 bars)"}
     val_risk, val_debug = calculate_valuation_risk(df)
     df['risk_valuation'] = val_risk
-    
+
     # 3. Momentum Risk (25%)
     rsi = calculate_rsi(df['Close'])
     df['rsi'] = rsi
     df['risk_momentum'] = normalize_series(rsi, lookback=252)
-    
+
     # 4. Volatility Risk (20%)
     bb_width = calculate_bollinger_width(df['Close'])
     df['risk_volatility'] = normalize_series(bb_width, lookback=252)
-    
+
     # 5. Volume Risk (15%) - Enhanced with MFI
     has_volume = 'Volume' in df.columns and df['Volume'].notna().any() and 'High' in df.columns
     if has_volume:
@@ -263,28 +344,71 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
     else:
         df['risk_volume'] = np.nan
 
-    weights = {
-        'risk_valuation': 0.40,
-        'risk_momentum': 0.25,
-        'risk_volatility': 0.20
-    }
-    if has_volume:
-        weights['risk_volume'] = 0.15
+    # Calculate Rolling Beta for Dynamic Sectoral Weighting
+    is_crypto = ticker.endswith("-USD") or "BTC" in ticker or "ETH" in ticker or "ADA" in ticker
+    bench_ticker = "BTC-USD" if is_crypto else "SPY"
+
+    if ticker == bench_ticker:
+        df['beta'] = 1.0
     else:
-        # Renormalize if volume is missing
-        weights = {k: v / sum(weights.values()) for k, v in weights.items()}
+        df['beta'] = calculate_dynamic_beta(df, bench_ticker)
+
+    beta = df['beta']
+
+    # Pre-allocate weight series based on beta
+    clipped_beta = beta.clip(0.6, 1.2)
+    norm_beta = (clipped_beta - 0.6) / 0.6 # 0 to 1
+
+    # Linear interpolation:
+    # beta <= 0.6 -> w_val=0.60, w_vol=0.10, w_mom=0.20
+    # beta >= 1.2 -> w_val=0.20, w_vol=0.35, w_mom=0.35
+    w_val = 0.60 - (norm_beta * 0.40)
+    w_vol = 0.10 + (norm_beta * 0.25)
+    w_mom = 0.20 + (norm_beta * 0.15)
 
     def _safe_factor(name: str) -> pd.Series:
         return df.get(name, pd.Series(np.nan, index=df.index)).fillna(0.5)
 
-    total_weight = sum(weights.values())
-    df['risk_total'] = sum(_safe_factor(name) * (weight / total_weight) for name, weight in weights.items())
+    if has_volume:
+        w_volm = pd.Series(0.10, index=df.index)
+        total_w = w_val + w_mom + w_vol + w_volm
+        w_val /= total_w
+        w_mom /= total_w
+        w_vol /= total_w
+        w_volm /= total_w
+
+        df['w_valuation'] = w_val
+        df['w_momentum'] = w_mom
+        df['w_volatility'] = w_vol
+        df['w_volume'] = w_volm
+
+        df['risk_total'] = (
+            _safe_factor('risk_valuation') * df['w_valuation'] +
+            _safe_factor('risk_momentum') * df['w_momentum'] +
+            _safe_factor('risk_volatility') * df['w_volatility'] +
+            _safe_factor('risk_volume') * df['w_volume']
+        )
+    else:
+        total_w = w_val + w_mom + w_vol
+        w_val /= total_w
+        w_mom /= total_w
+        w_vol /= total_w
+
+        df['w_valuation'] = w_val
+        df['w_momentum'] = w_mom
+        df['w_volatility'] = w_vol
+
+        df['risk_total'] = (
+            _safe_factor('risk_valuation') * df['w_valuation'] +
+            _safe_factor('risk_momentum') * df['w_momentum'] +
+            _safe_factor('risk_volatility') * df['w_volatility']
+        )
 
     df['sma_20d'] = df['Close'].rolling(window=20).mean()
 
     # Clean early NaNs in inputs without discarding full history
     df = df.dropna(subset=['risk_total'])
-    
+
     # --- Trend / context metrics for AI prompt ---
     cowen_meta = {}
     if ticker.endswith("-USD") or ticker in ["GC=F", "SI=F"]:
@@ -343,7 +467,7 @@ def analyze_asset(ticker: str) -> tuple[pd.DataFrame, dict, dict]:
         "reason": None,  # reserved for hard stops (e.g., insufficient history)
         **cowen_meta
     }
-    
+
     return df, cowen_meta, metadata
 
 def calculate_mlr(gold_df, gdx_df, period=60):
@@ -353,21 +477,21 @@ def calculate_mlr(gold_df, gdx_df, period=60):
     Target: < 0.5 (Undervalued), > 3 (Bubble).
     """
     if gold_df.empty or gdx_df.empty: return 0.0
-    
+
     # Align dates
     common_idx = gold_df.index.intersection(gdx_df.index)
     g = gold_df.loc[common_idx, 'Close'].pct_change()
     m = gdx_df.loc[common_idx, 'Close'].pct_change()
-    
+
     # User Spec: "(GDX % change) / (Gold % change)"
     # We use rolling sum of returns to smooth daily noise
     roll_g = g.rolling(period).sum()
     roll_m = m.rolling(period).sum()
-    
+
     # Handle division by zero
     mlr = roll_m / roll_g
     mlr = mlr.replace([np.inf, -np.inf], np.nan).fillna(0)
-    
+
     return mlr.iloc[-1]
 
 def calculate_yield_corr(gold_df, tnx_df, period=60):
@@ -376,11 +500,11 @@ def calculate_yield_corr(gold_df, tnx_df, period=60):
     Target: -0.7 to -0.9 (Normal). > +0.3 (Crisis).
     """
     if gold_df.empty or tnx_df.empty: return 0.0
-    
+
     common_idx = gold_df.index.intersection(tnx_df.index)
     g = gold_df.loc[common_idx, 'Close']
     y = tnx_df.loc[common_idx, 'Close']
-    
+
     corr = g.rolling(period).corr(y)
     return corr.iloc[-1]
 
