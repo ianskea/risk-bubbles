@@ -13,6 +13,16 @@ BUY_THRESHOLD_GRID = [0.15, 0.25, 0.30, 0.35]
 MOONBAG_GRID = [0.0, 0.2, 0.4, 0.6]
 BOOST_GRID = [1.0, 1.2, 1.4]
 STOP_SMA_GRID = [20, 50]
+
+
+def get_sector_strategy_params(sector_data):
+    params = sector_data.get("strategy_params", {}).copy()
+    params.setdefault("exit_threshold", sector_data.get("danger_zone_threshold", 0.8))
+    params.setdefault("buy_threshold", 0.30)
+    params.setdefault("moonbag_position", 0.2)
+    params.setdefault("boost_position", 1.4)
+    params.setdefault("stop_sma_days", 20)
+    return params
 STRATEGY_GRID_SIZE = (
     len(THRESHOLD_GRID)
     * len(BUY_THRESHOLD_GRID)
@@ -256,7 +266,7 @@ def run_suite():
     skipped = 0
     
     for sector_name, sector_data in SECTOR_INTELLIGENCE.items():
-        exit_t = sector_data.get("danger_zone_threshold", 0.8)
+        strategy_params = get_sector_strategy_params(sector_data)
         prepared_assets[sector_name] = []
         
         for name, ticker in sector_data["assets"].items():
@@ -268,7 +278,7 @@ def run_suite():
                 continue
 
             prepared_assets[sector_name].append((ticker, df))
-            metrics = run_strategy_on_frame(df, exit_t)
+            metrics = run_strategy_on_frame(df, **strategy_params)
             results.append(format_backtest_result(ticker, sector_name, metrics))
         
     res_df = pd.DataFrame(results)

@@ -37,11 +37,18 @@ BTC_ON_CHAIN_FLOOR_METADATA = {
 
 SECTOR_INTELLIGENCE = {
     "Crypto": {
-        "danger_zone_threshold": 0.85,
+        "danger_zone_threshold": 0.55,
         "fetch_santiment": True,
         "last_reviewed": LAST_UPDATED,
         "source_tags": ["global-liquidity", "btc-etf-flows", "on-chain", "usd"],
-        "threshold_rationale": "Backtest sweep selected 0.85, but Crypto remains unvalidated: avg alpha -0.30x, avg protection -4.7%, 0% success rate.",
+        "strategy_params": {
+            "exit_threshold": 0.55,
+            "buy_threshold": 0.15,
+            "moonbag_position": 0.0,
+            "boost_position": 1.0,
+            "stop_sma_days": 50,
+        },
+        "threshold_rationale": "Strategy sweep selected exit 0.55, buy 0.15, moonbag 0.0, boost 1.0, stop SMA 50: avg alpha +0.04x, avg protection +0.9%, 67% success rate.",
         "sector_context": "High-beta digital assets. Sensitive to global liquidity, ETF/treasury flows, USD strength, and on-chain valuation bands.",
         "assets": {
             "Bitcoin": "BTC-USD",
@@ -54,7 +61,14 @@ SECTOR_INTELLIGENCE = {
         "fetch_santiment": False,
         "last_reviewed": LAST_UPDATED,
         "source_tags": ["btc-dominance", "eth-btc", "altcoin-rotation"],
-        "threshold_rationale": "Backtest sweep selected 0.55 as the least-bad rotation threshold: avg alpha -0.05x, avg protection -3.5%, 33% success rate.",
+        "strategy_params": {
+            "exit_threshold": 0.55,
+            "buy_threshold": 0.15,
+            "moonbag_position": 0.0,
+            "boost_position": 1.0,
+            "stop_sma_days": 20,
+        },
+        "threshold_rationale": "Strategy sweep selected exit 0.55, buy 0.15, moonbag 0.0, boost 1.0, stop SMA 20: avg alpha +0.05x, avg protection +2.2%, 67% success rate.",
         "sector_context": "Crypto cross-pairs (Capital Waterfall). Tracks liquidity rotation from BTC into ETH and Alts. High risk means the altcoin cycle is exhausted against BTC.",
         "assets": {
             "ETH / BTC": "ETH-BTC",
@@ -63,11 +77,18 @@ SECTOR_INTELLIGENCE = {
         },
     },
     "Commodities": {
-        "danger_zone_threshold": 0.85,
+        "danger_zone_threshold": 0.60,
         "fetch_santiment": False,
         "last_reviewed": LAST_UPDATED,
         "source_tags": ["real-yields", "usd", "inflation", "geopolitics"],
-        "threshold_rationale": "Backtest sweep selected 0.85: roughly neutral avg alpha and drawdown protection, with no observed outperformance edge.",
+        "strategy_params": {
+            "exit_threshold": 0.60,
+            "buy_threshold": 0.35,
+            "moonbag_position": 0.6,
+            "boost_position": 1.4,
+            "stop_sma_days": 50,
+        },
+        "threshold_rationale": "Strategy sweep selected exit 0.60, buy 0.35, moonbag 0.6, boost 1.4, stop SMA 50: avg alpha +0.02x, avg protection +2.1%, 100% success rate.",
         "sector_context": "Global hard assets. Driven by inflation expectations, real yields, USD strength, industrial demand, and geopolitical risk.",
         "assets": {
             "Gold": "GC=F",
@@ -79,7 +100,14 @@ SECTOR_INTELLIGENCE = {
         "fetch_santiment": False,
         "last_reviewed": LAST_UPDATED,
         "source_tags": ["china-demand", "iron-ore", "copper", "lithium", "aud-cny"],
-        "threshold_rationale": "Backtest sweep selected 0.55: avg alpha +0.08x, avg protection -1.9%, 71% success rate.",
+        "strategy_params": {
+            "exit_threshold": 0.55,
+            "buy_threshold": 0.15,
+            "moonbag_position": 0.0,
+            "boost_position": 1.0,
+            "stop_sma_days": 20,
+        },
+        "threshold_rationale": "Strategy sweep selected exit 0.55, buy 0.15, moonbag 0.0, boost 1.0, stop SMA 20: avg alpha +0.19x, avg protection +3.4%, 86% success rate.",
         "sector_context": "Australian Large-Cap Miners (ASX). Highly correlated to iron ore, copper, lithium demand, Chinese policy support, and AUD/CNY moves.",
         "assets": {
             "BHP Group": "BHP.AX",
@@ -92,11 +120,18 @@ SECTOR_INTELLIGENCE = {
         },
     },
     "ASX_Financials_Other": {
-        "danger_zone_threshold": 0.85,
+        "danger_zone_threshold": 0.75,
         "fetch_santiment": False,
         "last_reviewed": LAST_UPDATED,
         "source_tags": ["rba-policy", "credit-growth", "housing", "domestic-demand"],
-        "threshold_rationale": "Backtest sweep selected 0.85: avg alpha +0.09x, avg protection -4.6%, 67% success rate.",
+        "strategy_params": {
+            "exit_threshold": 0.75,
+            "buy_threshold": 0.30,
+            "moonbag_position": 0.0,
+            "boost_position": 1.4,
+            "stop_sma_days": 50,
+        },
+        "threshold_rationale": "Strategy sweep selected exit 0.75, buy 0.30, moonbag 0.0, boost 1.4, stop SMA 50: avg alpha +0.12x, avg protection -4.8%, 67% success rate.",
         "sector_context": "Australian Financials and domestic large caps. Sensitive to RBA policy, mortgage stress, credit growth, and domestic demand.",
         "assets": {
             "Macquarie Group": "MQG.AX",
@@ -109,7 +144,14 @@ SECTOR_INTELLIGENCE = {
         "fetch_santiment": False,
         "last_reviewed": LAST_UPDATED,
         "source_tags": ["us-yields", "ai-capex", "earnings-revisions", "valuation"],
-        "threshold_rationale": "Backtest sweep selected 0.80: avg alpha +0.13x, avg protection -5.4%, 50% success rate.",
+        "strategy_params": {
+            "exit_threshold": 0.80,
+            "buy_threshold": 0.30,
+            "moonbag_position": 0.0,
+            "boost_position": 1.4,
+            "stop_sma_days": 20,
+        },
+        "threshold_rationale": "Strategy sweep selected exit 0.80, buy 0.30, moonbag 0.0, boost 1.4, stop SMA 20: avg alpha +0.13x, avg protection -5.4%, 50% success rate.",
         "sector_context": "Global technology and semiconductor equities. Sensitive to US Treasury yields, AI CapEx durability, earnings revisions, and valuation crowding.",
         "assets": {
             "Global X Semi": "SEMI.AX",
@@ -123,7 +165,14 @@ SECTOR_INTELLIGENCE = {
         "fetch_santiment": False,
         "last_reviewed": LAST_UPDATED,
         "source_tags": ["global-growth", "china-demand", "currency", "exports"],
-        "threshold_rationale": "Backtest sweep selected 0.75 as the least-bad setting: avg alpha -0.07x, avg protection -7.1%, 33% success rate.",
+        "strategy_params": {
+            "exit_threshold": 0.75,
+            "buy_threshold": 0.15,
+            "moonbag_position": 0.0,
+            "boost_position": 1.0,
+            "stop_sma_days": 20,
+        },
+        "threshold_rationale": "Strategy sweep selected exit 0.75, buy 0.15, moonbag 0.0, boost 1.0, stop SMA 20: avg alpha +0.03x, avg protection -0.4%, 100% success rate.",
         "sector_context": "Broad regional equities (Asia/Europe). Driven by global growth, regional fiscal policy, China demand, currency moves, and export cycles.",
         "assets": {
             "BetaShares Asia": "ASIA.AX",
@@ -136,7 +185,14 @@ SECTOR_INTELLIGENCE = {
         "fetch_santiment": False,
         "last_reviewed": LAST_UPDATED,
         "source_tags": ["healthcare", "energy", "infrastructure", "capex"],
-        "threshold_rationale": "Backtest sweep selected 0.85: avg alpha +0.04x, avg protection -3.2%, 75% success rate.",
+        "strategy_params": {
+            "exit_threshold": 0.85,
+            "buy_threshold": 0.35,
+            "moonbag_position": 0.0,
+            "boost_position": 1.4,
+            "stop_sma_days": 50,
+        },
+        "threshold_rationale": "Strategy sweep selected exit 0.85, buy 0.35, moonbag 0.0, boost 1.4, stop SMA 50: avg alpha +0.09x, avg protection -3.2%, 100% success rate.",
         "sector_context": "Global thematic equities. Healthcare is defensive; energy and infrastructure are tied to capex cycles, power demand, and commodity volatility.",
         "assets": {
             "Battery Tech": "ACDC.AX",
@@ -150,7 +206,14 @@ SECTOR_INTELLIGENCE = {
         "fetch_santiment": False,
         "last_reviewed": LAST_UPDATED,
         "source_tags": ["rba-policy", "property", "resources", "domestic-income"],
-        "threshold_rationale": "Backtest sweep selected 0.70 as the least-bad setting: avg alpha near 0.00x, avg protection -3.9%, 50% success rate.",
+        "strategy_params": {
+            "exit_threshold": 0.70,
+            "buy_threshold": 0.35,
+            "moonbag_position": 0.0,
+            "boost_position": 1.4,
+            "stop_sma_days": 20,
+        },
+        "threshold_rationale": "Strategy sweep selected exit 0.70, buy 0.35, moonbag 0.0, boost 1.4, stop SMA 20: avg alpha +0.06x, avg protection -3.3%, 100% success rate.",
         "sector_context": "Australian domestic sector ETFs. Property is rate and income sensitive; resources remain tied to China demand and commodity cycles.",
         "assets": {
             "BetaShares Mining Resources": "QRE.AX",
@@ -195,9 +258,17 @@ def validate_sector_intelligence(config: dict[str, dict[str, Any]] | None = None
         "fetch_santiment",
         "last_reviewed",
         "source_tags",
+        "strategy_params",
         "threshold_rationale",
         "sector_context",
         "assets",
+    }
+    strategy_required_keys = {
+        "exit_threshold",
+        "buy_threshold",
+        "moonbag_position",
+        "boost_position",
+        "stop_sma_days",
     }
     ticker_to_sector = {}
 
@@ -229,6 +300,27 @@ def validate_sector_intelligence(config: dict[str, dict[str, Any]] | None = None
             or not all(isinstance(tag, str) and tag for tag in source_tags)
         ):
             errors.append(f"{sector_name}: source_tags must be a non-empty list of strings")
+
+        strategy_params = sector_data.get("strategy_params")
+        if not isinstance(strategy_params, dict):
+            errors.append(f"{sector_name}: strategy_params must be a dict")
+        else:
+            missing_strategy_keys = strategy_required_keys - set(strategy_params)
+            if missing_strategy_keys:
+                errors.append(f"{sector_name}: strategy_params missing keys {sorted(missing_strategy_keys)}")
+
+            for key in ("exit_threshold", "buy_threshold"):
+                value = strategy_params.get(key)
+                if not isinstance(value, (int, float)) or not 0 < value < 1:
+                    errors.append(f"{sector_name}: strategy_params.{key} must be between 0 and 1")
+
+            for key in ("moonbag_position", "boost_position"):
+                value = strategy_params.get(key)
+                if not isinstance(value, (int, float)) or value < 0:
+                    errors.append(f"{sector_name}: strategy_params.{key} must be >= 0")
+
+            if strategy_params.get("stop_sma_days") not in (20, 50):
+                errors.append(f"{sector_name}: strategy_params.stop_sma_days must be 20 or 50")
 
         assets = sector_data.get("assets")
         if not isinstance(assets, dict) or not assets:

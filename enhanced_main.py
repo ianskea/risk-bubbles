@@ -77,14 +77,13 @@ def generate_ai_analysis(ticker, price, risk, metrics, meta):
     Gone Home Status: {meta.get('gone_home', 'N/A')}
     Sector Context: {meta.get('sector_context', 'General Asset')}
     Sector Threshold Rationale: {meta.get('sector_threshold_rationale', 'N/A')}
+    Strategy Parameters: {meta.get('sector_strategy_params', 'N/A')}
     
     Interpretation Rules (v2.0 Asymmetric):
-    - Value Zone (< 0.30): Institutional Accumulation (Buy).
-    - Danger Zone: Redlines vary by asset:
-        - Crypto (BTC/ETH): > 0.85
-        - Broad Market (VGS/MQG): > 0.80
-        - Satellite/Miners: > 0.75
-    - If risk is below Danger Zone but high, reduce to Moonbag.
+    - Value Zone: use the sector-specific buy_threshold in Strategy Parameters.
+    - Danger Zone: use the sector-specific exit_threshold in Strategy Parameters.
+    - If risk is above exit_threshold and price is below the configured stop SMA, reduce to the configured moonbag_position.
+    - If risk is below buy_threshold, use the configured boost_position.
     
     Context:
     - Performance: 30d {ret_30}, 90d {ret_90}, 365d {ret_365}
@@ -122,6 +121,28 @@ def generate_ai_analysis(ticker, price, risk, metrics, meta):
             time.sleep(2 * (attempt + 1)) # Backoff
             
     return "AI Analysis Failed after retries."
+
+
+def get_sector_strategy_params(sector_data):
+    params = sector_data.get("strategy_params", {}).copy()
+    params.setdefault("exit_threshold", sector_data.get("danger_zone_threshold", 0.8))
+    params.setdefault("buy_threshold", 0.30)
+    params.setdefault("moonbag_position", 0.2)
+    params.setdefault("boost_position", 1.4)
+    params.setdefault("stop_sma_days", 20)
+    return params
+
+
+def get_stop_level(meta, price, stop_sma_days):
+    if stop_sma_days == 20:
+        return meta.get("sma_20d")
+
+    if stop_sma_days == 50:
+        ma50_dist = meta.get("ma50_dist")
+        if ma50_dist is not None and not pd.isna(ma50_dist) and (1 + ma50_dist) != 0:
+            return price / (1 + ma50_dist)
+
+    return meta.get("sma_20d")
 
 def analyze_market_cycle():
     """
@@ -221,7 +242,8 @@ def main():
     
     for sector_name, sector_data in SECTOR_INTELLIGENCE.items():
         print(f"\n--- Processing Sector: {sector_name} ---")
-        exit_t = sector_data.get("danger_zone_threshold", 0.8)
+        strategy_params = get_sector_strategy_params(sector_data)
+        exit_t = strategy_params["exit_threshold"]
         fetch_santiment = sector_data.get("fetch_santiment", False)
         
         for name, ticker in sector_data["assets"].items():
@@ -270,13 +292,15 @@ def main():
                     "meta": meta,
                     "val_metrics": val_metrics,
                     "sector": sector_name,
-                    "exit_threshold": exit_t
+                    "exit_threshold": exit_t,
+                    "strategy_params": strategy_params,
                 }
                 
                 # Inject Sector Context
                 asset_data["meta"]["sector_context"] = sector_data.get("sector_context", "General Asset")
                 asset_data["meta"]["sector_threshold_rationale"] = sector_data.get("threshold_rationale", "N/A")
                 asset_data["meta"]["sector_source_tags"] = sector_data.get("source_tags", [])
+                asset_data["meta"]["sector_strategy_params"] = strategy_params
                 
                 # Inject On-Chain Floors for BTC
                 if ticker == "BTC-USD":
@@ -340,18 +364,22 @@ def main():
         r = asset['risk']
         meta = asset['meta']
         price = asset['price']
-        sma_20d = meta.get('sma_20d', 0)
         
-        # Signal Logic (v2.1 Momentum Stop)
-        exit_t = asset.get('exit_threshold', 0.8)
+        strategy_params = asset.get('strategy_params', {})
+        exit_t = strategy_params.get('exit_threshold', asset.get('exit_threshold', 0.8))
+        buy_t = strategy_params.get('buy_threshold', 0.30)
+        moonbag = strategy_params.get('moonbag_position', 0.2)
+        boost = strategy_params.get('boost_position', 1.4)
+        stop_sma_days = strategy_params.get('stop_sma_days', 20)
+        stop_level = get_stop_level(meta, price, stop_sma_days)
         
-        if r < 0.3:
-            signal_str = "🟢 [BUY]"
+        if r < buy_t:
+            signal_str = f"🟢 [BUY / BOOST {boost:.1f}x]"
         elif r > exit_t:
-            if price > sma_20d:
+            if stop_level is None or pd.isna(stop_level) or price > stop_level:
                 signal_str = "🔥 [RIDE BUBBLE]"
             else:
-                signal_str = "🔴 [SELL (Trend Broken)]"
+                signal_str = f"🔴 [SELL / MOONBAG {moonbag:.1f}x]"
         else:
             signal_str = "🟡 [HOLD]"
         ma_context = []
@@ -386,6 +414,10 @@ Validation Score: {asset['score']}/100
             section += f"Santiment (31d Lag): MVRV {mvrv_str} ({sant_sum.get('mvrv_status', 'N/A')}) | Sentiment: {sant_sum.get('sentiment_status', 'N/A')}\n"
             
         section += f"Context: {context_line}\n"
+        section += (
+            f"Strategy Params: exit {exit_t:.2f}, buy {buy_t:.2f}, "
+            f"moonbag {moonbag:.1f}x, boost {boost:.1f}x, stop SMA {stop_sma_days}d\n"
+        )
 
         section += f"""
 AI INSIGHT:
