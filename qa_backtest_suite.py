@@ -2,12 +2,17 @@ import pandas as pd
 import numpy as np
 import os
 import sys
+from itertools import product
 from datetime import datetime, timedelta
 from enhanced_risk_analyzer import analyze_asset
 from sector_config import SECTOR_INTELLIGENCE
 
 
 THRESHOLD_GRID = [round(x, 2) for x in np.arange(0.55, 0.96, 0.05)]
+BUY_THRESHOLD_GRID = [0.15, 0.25, 0.30, 0.35]
+MOONBAG_GRID = [0.0, 0.2, 0.4, 0.6]
+BOOST_GRID = [1.0, 1.2, 1.4]
+STOP_SMA_GRID = [20, 50]
 
 
 def prepare_backtest_frame(ticker, years=5):
@@ -38,32 +43,49 @@ def prepare_backtest_frame(ticker, years=5):
     return df, None
 
 
-def run_strategy_on_frame(df, exit_threshold, fee=0.001):
+def get_stop_sma(df, stop_sma_days):
+    """Return a stop trend series, deriving it if the analyzer did not."""
+    col = f"sma_{stop_sma_days}d"
+    if col in df.columns:
+        return df[col]
+    return df["Close"].rolling(window=stop_sma_days, min_periods=max(2, stop_sma_days // 2)).mean()
+
+
+def run_strategy_on_frame(
+    df,
+    exit_threshold,
+    fee=0.001,
+    buy_threshold=0.30,
+    moonbag_position=0.2,
+    boost_position=1.4,
+    stop_sma_days=20,
+):
     df = df.copy()
 
     # Simulation Logic (v2.1 with Momentum Stop)
     positions = []
     risk_col = 'risk_total'
+    stop_sma = get_stop_sma(df, stop_sma_days)
     
     for i in range(len(df)):
         risk = df[risk_col].iloc[i]
         price = df['Close'].iloc[i]
-        sma_20 = df['sma_20d'].iloc[i]
+        trend_stop = stop_sma.iloc[i]
         
         # v2.1 Logic:
         # If risk > exit_threshold:
-        #    If price > sma_20 -> Hold (Riding the bubble) -> 1.0
-        #    If price < sma_20 -> Trend Broken, Cut to Moonbag -> 0.2
-        # If risk < 0.30 -> Boost -> 1.4
+        #    If price > trend_stop -> Hold (Riding the bubble) -> 1.0
+        #    If price < trend_stop -> Trend Broken, Cut to Moonbag
+        # If risk < buy_threshold -> Boost
         # Else -> Base -> 1.0
         
         if risk > exit_threshold:
-            if price > sma_20:
+            if pd.isna(trend_stop) or price > trend_stop:
                 pos = 1.0 # Riding Bubble
             else:
-                pos = 0.2 # Trend Broken
-        elif risk < 0.30:
-            pos = 1.4
+                pos = moonbag_position # Trend Broken
+        elif risk < buy_threshold:
+            pos = boost_position
         else:
             pos = 1.0
             
@@ -172,6 +194,67 @@ def optimize_sector_thresholds(prepared_assets, fee=0.001):
     return recommendations
 
 
+def strategy_parameter_grid():
+    """Yield full strategy parameter combinations for sector optimization."""
+    for exit_threshold, buy_threshold, moonbag, boost, stop_sma in product(
+        THRESHOLD_GRID,
+        BUY_THRESHOLD_GRID,
+        MOONBAG_GRID,
+        BOOST_GRID,
+        STOP_SMA_GRID,
+    ):
+        yield {
+            "exit_threshold": exit_threshold,
+            "buy_threshold": buy_threshold,
+            "moonbag_position": moonbag,
+            "boost_position": boost,
+            "stop_sma_days": stop_sma,
+        }
+
+
+def score_summary(summary):
+    # Blend return alpha and drawdown protection. Protection is a percentage, so
+    # divide by 100 to put it on a return-multiple scale.
+    return summary["avg_alpha"] + (summary["avg_protection"] / 100)
+
+
+def optimize_sector_strategy(prepared_assets, fee=0.001):
+    recommendations = []
+
+    for sector_name, assets in prepared_assets.items():
+        if not assets:
+            continue
+
+        sector_results = []
+        for params in strategy_parameter_grid():
+            metrics = [
+                run_strategy_on_frame(df, fee=fee, **params)
+                for _, df in assets
+            ]
+            summary = summarize_numeric_results(metrics)
+            if not summary:
+                continue
+
+            sector_results.append({
+                "Sector": sector_name,
+                "Exit": params["exit_threshold"],
+                "Buy": params["buy_threshold"],
+                "Moonbag": params["moonbag_position"],
+                "Boost": params["boost_position"],
+                "Stop SMA": params["stop_sma_days"],
+                "Assets": summary["assets"],
+                "Avg Alpha": summary["avg_alpha"],
+                "Avg Protection": summary["avg_protection"],
+                "Success Rate": summary["success_rate"],
+                "Score": score_summary(summary),
+            })
+
+        if sector_results:
+            recommendations.append(max(sector_results, key=lambda row: row["Score"]))
+
+    return recommendations
+
+
 def run_suite():
     print(f"\n{'='*80}")
     print(f" INSTITUTIONAL QA & MULTI-MARKET BACKTEST (v2.1 Momentum Stop)")
@@ -226,6 +309,16 @@ def run_suite():
         rec_df["Score"] = rec_df["Score"].map(lambda x: f"{x:+.2f}")
         print("\n--- THRESHOLD SWEEP RECOMMENDATIONS ---")
         print(rec_df.to_string(index=False))
+
+    strategy_recommendations = optimize_sector_strategy(prepared_assets)
+    if strategy_recommendations:
+        strategy_df = pd.DataFrame(strategy_recommendations)
+        strategy_df["Avg Alpha"] = strategy_df["Avg Alpha"].map(lambda x: f"{x:+.2f}x")
+        strategy_df["Avg Protection"] = strategy_df["Avg Protection"].map(lambda x: f"{x:+.1f}%")
+        strategy_df["Success Rate"] = strategy_df["Success Rate"].map(lambda x: f"{x:.0f}%")
+        strategy_df["Score"] = strategy_df["Score"].map(lambda x: f"{x:+.2f}")
+        print("\n--- STRATEGY PARAMETER SWEEP RECOMMENDATIONS ---")
+        print(strategy_df.to_string(index=False))
 
     print(f"{'='*80}\n")
 
