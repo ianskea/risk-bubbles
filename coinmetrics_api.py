@@ -26,7 +26,7 @@ def fetch_coinmetrics_onchain(ticker="btc"):
     }
     
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
         

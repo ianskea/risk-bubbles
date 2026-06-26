@@ -9,7 +9,12 @@ from dotenv import load_dotenv
 import pandas as pd
 
 from enhanced_risk_analyzer import analyze_asset
-from sector_config import SECTOR_INTELLIGENCE, BTC_ON_CHAIN_FLOORS, LAST_UPDATED
+from sector_config import (
+    SECTOR_INTELLIGENCE,
+    get_btc_on_chain_floors,
+    get_stale_sector_reviews,
+    validate_sector_intelligence,
+)
 from charting import plot_comprehensive_analysis
 from model_validation import validate_model
 from sentiment_analyzer import fetch_crypto_sentiment, get_sentiment_advice
@@ -71,6 +76,7 @@ def generate_ai_analysis(ticker, price, risk, metrics, meta):
     Composite Risk Score: {risk:.2f} (0.0 = Buy/Value, 1.0 = Sell/Bubble)
     Gone Home Status: {meta.get('gone_home', 'N/A')}
     Sector Context: {meta.get('sector_context', 'General Asset')}
+    Sector Threshold Rationale: {meta.get('sector_threshold_rationale', 'N/A')}
     
     Interpretation Rules (v2.0 Asymmetric):
     - Value Zone (< 0.30): Institutional Accumulation (Buy).
@@ -269,10 +275,12 @@ def main():
                 
                 # Inject Sector Context
                 asset_data["meta"]["sector_context"] = sector_data.get("sector_context", "General Asset")
+                asset_data["meta"]["sector_threshold_rationale"] = sector_data.get("threshold_rationale", "N/A")
+                asset_data["meta"]["sector_source_tags"] = sector_data.get("source_tags", [])
                 
                 # Inject On-Chain Floors for BTC
                 if ticker == "BTC-USD":
-                    asset_data["meta"]["on_chain_floors"] = BTC_ON_CHAIN_FLOORS
+                    asset_data["meta"]["on_chain_floors"] = get_btc_on_chain_floors()
                 
                 # Inject Santiment Data
                 if fetch_santiment:
@@ -302,15 +310,19 @@ def main():
     full_report = f"INSTITUTIONAL RISK REPORT - {datetime.now().strftime('%Y-%m-%d')}\n"
     full_report += "="*60 + "\n"
     
-    # Check for stale sector configuration
-    try:
-        last_updated_date = datetime.strptime(LAST_UPDATED, "%Y-%m-%d")
-        if (datetime.now() - last_updated_date).days > 30:
-            staleness_warning = "\n⚠️  WARNING: Sector Intelligence is over 30 days old. Review sector_config.py.\n"
-            print(staleness_warning)
-            full_report += staleness_warning
-    except ValueError:
-        pass
+    config_errors = validate_sector_intelligence()
+    if config_errors:
+        config_warning = "\n⚠️  WARNING: Sector Intelligence config validation failed:\n"
+        config_warning += "\n".join([f"- {error}" for error in config_errors]) + "\n"
+        print(config_warning)
+        full_report += config_warning
+
+    stale_reviews = get_stale_sector_reviews()
+    if stale_reviews:
+        stale_list = ", ".join([f"{sector} ({days}d)" for sector, days in stale_reviews.items()])
+        staleness_warning = f"\n⚠️  WARNING: Sector Intelligence reviews are stale: {stale_list}. Review sector_config.py.\n"
+        print(staleness_warning)
+        full_report += staleness_warning
         
     full_report += "\n"
     
