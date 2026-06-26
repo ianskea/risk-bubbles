@@ -13,6 +13,13 @@ BUY_THRESHOLD_GRID = [0.15, 0.25, 0.30, 0.35]
 MOONBAG_GRID = [0.0, 0.2, 0.4, 0.6]
 BOOST_GRID = [1.0, 1.2, 1.4]
 STOP_SMA_GRID = [20, 50]
+STRATEGY_GRID_SIZE = (
+    len(THRESHOLD_GRID)
+    * len(BUY_THRESHOLD_GRID)
+    * len(MOONBAG_GRID)
+    * len(BOOST_GRID)
+    * len(STOP_SMA_GRID)
+)
 
 
 def prepare_backtest_frame(ticker, years=5):
@@ -61,37 +68,19 @@ def run_strategy_on_frame(
     stop_sma_days=20,
 ):
     df = df.copy()
-
-    # Simulation Logic (v2.1 with Momentum Stop)
-    positions = []
-    risk_col = 'risk_total'
     stop_sma = get_stop_sma(df, stop_sma_days)
-    
-    for i in range(len(df)):
-        risk = df[risk_col].iloc[i]
-        price = df['Close'].iloc[i]
-        trend_stop = stop_sma.iloc[i]
-        
-        # v2.1 Logic:
-        # If risk > exit_threshold:
-        #    If price > trend_stop -> Hold (Riding the bubble) -> 1.0
-        #    If price < trend_stop -> Trend Broken, Cut to Moonbag
-        # If risk < buy_threshold -> Boost
-        # Else -> Base -> 1.0
-        
-        if risk > exit_threshold:
-            if pd.isna(trend_stop) or price > trend_stop:
-                pos = 1.0 # Riding Bubble
-            else:
-                pos = moonbag_position # Trend Broken
-        elif risk < buy_threshold:
-            pos = boost_position
-        else:
-            pos = 1.0
-            
-        positions.append(pos)
 
-    df['position'] = positions
+    risk = df["risk_total"]
+    price = df["Close"]
+    high_risk = risk > exit_threshold
+    trend_broken = stop_sma.notna() & (price <= stop_sma)
+    buy_zone = risk < buy_threshold
+
+    df["position"] = np.select(
+        [high_risk & trend_broken, buy_zone],
+        [moonbag_position, boost_position],
+        default=1.0,
+    )
     df['trade'] = df['position'].diff().abs().fillna(0)
     df['raw_ret'] = df['Close'].pct_change()
     df['strat_ret'] = (df['position'].shift(1) * df['raw_ret']) - (df['trade'] * fee)
@@ -225,6 +214,7 @@ def optimize_sector_strategy(prepared_assets, fee=0.001):
         if not assets:
             continue
 
+        print(f"Optimizing {sector_name}: {STRATEGY_GRID_SIZE} parameter sets across {len(assets)} assets...")
         sector_results = []
         for params in strategy_parameter_grid():
             metrics = [
