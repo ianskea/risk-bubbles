@@ -20,6 +20,7 @@ from charting import plot_comprehensive_analysis
 from model_validation import validate_model
 from sentiment_analyzer import fetch_crypto_sentiment, get_sentiment_advice
 from santiment_api import fetch_santiment_summary
+from trade_decision import evaluate_trade_decision, load_decision_state, save_decision_state
 
 # Load Environment Variables
 load_dotenv()
@@ -157,6 +158,46 @@ def format_sector_validation_metrics(metrics):
         f"success {metrics.get('success_rate', 0):.0f}%, "
         f"assets {metrics.get('assets', 0)}"
     )
+
+
+def calculate_signal_state(risk, price, meta, strategy_params):
+    exit_t = strategy_params.get("exit_threshold", 0.8)
+    buy_t = strategy_params.get("buy_threshold", 0.30)
+    moonbag = strategy_params.get("moonbag_position", 0.2)
+    boost = strategy_params.get("boost_position", 1.4)
+    stop_sma_days = strategy_params.get("stop_sma_days", 20)
+    stop_level = get_stop_level(meta, price, stop_sma_days)
+
+    if risk < buy_t:
+        return {
+            "signal": "BUY",
+            "target_position": boost,
+            "signal_text": f"🟢 [BUY / BOOST {boost:.1f}x]",
+            "stop_level": stop_level,
+        }
+
+    if risk > exit_t:
+        if stop_level is None or pd.isna(stop_level) or price > stop_level:
+            return {
+                "signal": "RIDE_BUBBLE",
+                "target_position": 1.0,
+                "signal_text": "🔥 [RIDE BUBBLE]",
+                "stop_level": stop_level,
+            }
+
+        return {
+            "signal": "SELL",
+            "target_position": moonbag,
+            "signal_text": f"🔴 [SELL / MOONBAG {moonbag:.1f}x]",
+            "stop_level": stop_level,
+        }
+
+    return {
+        "signal": "HOLD",
+        "target_position": 1.0,
+        "signal_text": "🟡 [HOLD]",
+        "stop_level": stop_level,
+    }
 
 def analyze_market_cycle():
     """
@@ -374,6 +415,7 @@ def main():
     # 2. VALIDATED SIGNALS
     full_report += "SECTION 1: ACTIONABLE INSTITUTIONAL SIGNALS (Validation >= 60)\n"
     full_report += "="*60 + "\n"
+    decision_state = load_decision_state()
     
     if not valid_assets:
         full_report += "No assets passed strict validation criteria.\n"
@@ -389,17 +431,19 @@ def main():
         moonbag = strategy_params.get('moonbag_position', 0.2)
         boost = strategy_params.get('boost_position', 1.4)
         stop_sma_days = strategy_params.get('stop_sma_days', 20)
-        stop_level = get_stop_level(meta, price, stop_sma_days)
-        
-        if r < buy_t:
-            signal_str = f"🟢 [BUY / BOOST {boost:.1f}x]"
-        elif r > exit_t:
-            if stop_level is None or pd.isna(stop_level) or price > stop_level:
-                signal_str = "🔥 [RIDE BUBBLE]"
-            else:
-                signal_str = f"🔴 [SELL / MOONBAG {moonbag:.1f}x]"
-        else:
-            signal_str = "🟡 [HOLD]"
+        signal_state = calculate_signal_state(r, price, meta, strategy_params)
+        signal_str = signal_state["signal_text"]
+        trade_decision = evaluate_trade_decision(
+            ticker=asset["ticker"],
+            name=asset["name"],
+            sector=asset["sector"],
+            readiness=asset.get("sector_readiness", "Watch Only"),
+            signal=signal_state["signal"],
+            target_position=signal_state["target_position"],
+            risk=r,
+            price=price,
+            state=decision_state,
+        )
         ma_context = []
         if meta.get("ma50_dist") is not None and not pd.isna(meta.get("ma50_dist")):
             ma_context.append(f"MA50 dist: {meta['ma50_dist']*100:.1f}%")
@@ -418,6 +462,8 @@ RISK SCORE: {r:.2f}  {signal_str}
 Gone Home Status: {meta.get('gone_home', 'N/A')}
 Validation Score: {asset['score']}/100
 Sector Readiness: {asset.get('sector_readiness', 'N/A')}
+Trade Decision: {trade_decision['action']} | Target: {trade_decision['target_position']:.2f}x
+Decision Reason: {trade_decision['reason']}
 """
         # [NEW] On-Chain Context for BTC
         if asset['ticker'] == "BTC-USD":
@@ -445,6 +491,8 @@ AI INSIGHT:
 --------------------------------------------------
 """
         full_report += section
+
+    save_decision_state(decision_state)
 
     # 3. FAILED MODELS
     full_report += "\nSECTION 2: MODEL FAILURE / NO SIGNAL\n"
