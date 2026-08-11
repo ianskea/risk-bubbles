@@ -15,7 +15,7 @@ DATE_FORMAT = "%Y-%m-%d"
 MAX_REVIEW_AGE_DAYS = 30
 
 # Date when the sector specifics were last reviewed.
-LAST_UPDATED = "2026-06-26"
+LAST_UPDATED = "2026-08-11"
 
 # Static fallback floors. Realized Price can be refreshed dynamically via
 # get_btc_on_chain_floors(); Balance Price remains a manual cycle-level guard.
@@ -48,6 +48,14 @@ SECTOR_INTELLIGENCE = {
             "boost_position": 1.0,
             "stop_sma_days": 50,
         },
+        "validation_metrics": {
+            "avg_alpha": 0.04,
+            "avg_protection": 0.9,
+            "success_rate": 67,
+            "assets": 3,
+            "validated_on": "2026-06-26",
+        },
+        "validation_status": "thin_edge",
         "threshold_rationale": "Strategy sweep selected exit 0.55, buy 0.15, moonbag 0.0, boost 1.0, stop SMA 50: avg alpha +0.04x, avg protection +0.9%, 67% success rate.",
         "sector_context": "High-beta digital assets. Sensitive to global liquidity, ETF/treasury flows, USD strength, and on-chain valuation bands.",
         "assets": {
@@ -68,6 +76,14 @@ SECTOR_INTELLIGENCE = {
             "boost_position": 1.0,
             "stop_sma_days": 20,
         },
+        "validation_metrics": {
+            "avg_alpha": 0.05,
+            "avg_protection": 2.2,
+            "success_rate": 67,
+            "assets": 3,
+            "validated_on": "2026-06-26",
+        },
+        "validation_status": "validated",
         "threshold_rationale": "Strategy sweep selected exit 0.55, buy 0.15, moonbag 0.0, boost 1.0, stop SMA 20: avg alpha +0.05x, avg protection +2.2%, 67% success rate.",
         "sector_context": "Crypto cross-pairs (Capital Waterfall). Tracks liquidity rotation from BTC into ETH and Alts. High risk means the altcoin cycle is exhausted against BTC.",
         "assets": {
@@ -88,6 +104,14 @@ SECTOR_INTELLIGENCE = {
             "boost_position": 1.4,
             "stop_sma_days": 50,
         },
+        "validation_metrics": {
+            "avg_alpha": 0.02,
+            "avg_protection": 2.1,
+            "success_rate": 100,
+            "assets": 2,
+            "validated_on": "2026-06-26",
+        },
+        "validation_status": "thin_edge",
         "threshold_rationale": "Strategy sweep selected exit 0.60, buy 0.35, moonbag 0.6, boost 1.4, stop SMA 50: avg alpha +0.02x, avg protection +2.1%, 100% success rate.",
         "sector_context": "Global hard assets. Driven by inflation expectations, real yields, USD strength, industrial demand, and geopolitical risk.",
         "assets": {
@@ -107,6 +131,14 @@ SECTOR_INTELLIGENCE = {
             "boost_position": 1.0,
             "stop_sma_days": 20,
         },
+        "validation_metrics": {
+            "avg_alpha": 0.19,
+            "avg_protection": 3.4,
+            "success_rate": 86,
+            "assets": 7,
+            "validated_on": "2026-06-26",
+        },
+        "validation_status": "validated",
         "threshold_rationale": "Strategy sweep selected exit 0.55, buy 0.15, moonbag 0.0, boost 1.0, stop SMA 20: avg alpha +0.19x, avg protection +3.4%, 86% success rate.",
         "sector_context": "Australian Large-Cap Miners (ASX). Highly correlated to iron ore, copper, lithium demand, Chinese policy support, and AUD/CNY moves.",
         "assets": {
@@ -131,6 +163,14 @@ SECTOR_INTELLIGENCE = {
             "boost_position": 1.4,
             "stop_sma_days": 50,
         },
+        "validation_metrics": {
+            "avg_alpha": 0.12,
+            "avg_protection": -4.8,
+            "success_rate": 67,
+            "assets": 3,
+            "validated_on": "2026-06-26",
+        },
+        "validation_status": "return_edge_drawdown_risk",
         "threshold_rationale": "Strategy sweep selected exit 0.75, buy 0.30, moonbag 0.0, boost 1.4, stop SMA 50: avg alpha +0.12x, avg protection -4.8%, 67% success rate.",
         "sector_context": "Australian Financials and domestic large caps. Sensitive to RBA policy, mortgage stress, credit growth, and domestic demand.",
         "assets": {
@@ -151,6 +191,14 @@ SECTOR_INTELLIGENCE = {
             "boost_position": 1.4,
             "stop_sma_days": 20,
         },
+        "validation_metrics": {
+            "avg_alpha": 0.13,
+            "avg_protection": -5.4,
+            "success_rate": 50,
+            "assets": 4,
+            "validated_on": "2026-06-26",
+        },
+        "validation_status": "return_edge_drawdown_risk",
         "threshold_rationale": "Strategy sweep selected exit 0.80, buy 0.30, moonbag 0.0, boost 1.4, stop SMA 20: avg alpha +0.13x, avg protection -5.4%, 50% success rate.",
         "sector_context": "Global technology and semiconductor equities. Sensitive to US Treasury yields, AI CapEx durability, earnings revisions, and valuation crowding.",
         "assets": {
@@ -172,6 +220,14 @@ SECTOR_INTELLIGENCE = {
             "boost_position": 1.0,
             "stop_sma_days": 20,
         },
+        "validation_metrics": {
+            "avg_alpha": 0.03,
+            "avg_protection": -0.4,
+            "success_rate": 100,
+            "assets": 3,
+            "validated_on": "2026-06-26",
+        },
+        "validation_status": "thin_edge",
         "threshold_rationale": "Strategy sweep selected exit 0.75, buy 0.15, moonbag 0.0, boost 1.0, stop SMA 20: avg alpha +0.03x, avg protection -0.4%, 100% success rate.",
         "sector_context": "Broad regional equities (Asia/Europe). Driven by global growth, regional fiscal policy, China demand, currency moves, and export cycles.",
         "assets": {
@@ -192,6 +248,14 @@ SECTOR_INTELLIGENCE = {
             "boost_position": 1.4,
             "stop_sma_days": 50,
         },
+        "validation_metrics": {
+            "avg_alpha": 0.09,
+            "avg_protection": -3.2,
+            "success_rate": 100,
+            "assets": 4,
+            "validated_on": "2026-06-26",
+        },
+        "validation_status": "return_edge_drawdown_risk",
         "threshold_rationale": "Strategy sweep selected exit 0.85, buy 0.35, moonbag 0.0, boost 1.4, stop SMA 50: avg alpha +0.09x, avg protection -3.2%, 100% success rate.",
         "sector_context": "Global thematic equities. Healthcare is defensive; energy and infrastructure are tied to capex cycles, power demand, and commodity volatility.",
         "assets": {
@@ -213,6 +277,14 @@ SECTOR_INTELLIGENCE = {
             "boost_position": 1.4,
             "stop_sma_days": 20,
         },
+        "validation_metrics": {
+            "avg_alpha": 0.06,
+            "avg_protection": -3.3,
+            "success_rate": 100,
+            "assets": 2,
+            "validated_on": "2026-06-26",
+        },
+        "validation_status": "return_edge_drawdown_risk",
         "threshold_rationale": "Strategy sweep selected exit 0.70, buy 0.35, moonbag 0.0, boost 1.4, stop SMA 20: avg alpha +0.06x, avg protection -3.3%, 100% success rate.",
         "sector_context": "Australian domestic sector ETFs. Property is rate and income sensitive; resources remain tied to China demand and commodity cycles.",
         "assets": {
