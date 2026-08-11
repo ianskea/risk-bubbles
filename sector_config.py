@@ -13,6 +13,12 @@ from typing import Any
 
 DATE_FORMAT = "%Y-%m-%d"
 MAX_REVIEW_AGE_DAYS = 30
+VALIDATION_STATUSES = {
+    "validated",
+    "thin_edge",
+    "return_edge_drawdown_risk",
+    "watch_only",
+}
 
 # Date when the sector specifics were last reviewed.
 LAST_UPDATED = "2026-08-11"
@@ -208,6 +214,32 @@ SECTOR_INTELLIGENCE = {
             "BetaShares NDQ": "NDQ.AX",
         },
     },
+    "Cybersecurity_ETFs": {
+        "danger_zone_threshold": 0.55,
+        "fetch_santiment": False,
+        "last_reviewed": LAST_UPDATED,
+        "source_tags": ["cybersecurity", "global-tech", "software", "usd", "valuation"],
+        "strategy_params": {
+            "exit_threshold": 0.55,
+            "buy_threshold": 0.35,
+            "moonbag_position": 0.0,
+            "boost_position": 1.4,
+            "stop_sma_days": 50,
+        },
+        "validation_metrics": {
+            "avg_alpha": 0.55,
+            "avg_protection": -7.2,
+            "success_rate": 100,
+            "assets": 1,
+            "validated_on": LAST_UPDATED,
+        },
+        "validation_status": "return_edge_drawdown_risk",
+        "threshold_rationale": "HACK-only strategy sweep selected exit 0.55, buy 0.35, moonbag 0.0, boost 1.4, stop SMA 50: avg alpha +0.55x, avg protection -7.2%, 100% success rate.",
+        "sector_context": "Global cybersecurity ETF exposure. Sensitive to software valuations, enterprise security spend, USD moves, and technology risk appetite.",
+        "assets": {
+            "BetaShares Cybersecurity": "HACK.AX",
+        },
+    },
     "Regional_Equities_ETFs": {
         "danger_zone_threshold": 0.75,
         "fetch_santiment": False,
@@ -331,6 +363,8 @@ def validate_sector_intelligence(config: dict[str, dict[str, Any]] | None = None
         "last_reviewed",
         "source_tags",
         "strategy_params",
+        "validation_metrics",
+        "validation_status",
         "threshold_rationale",
         "sector_context",
         "assets",
@@ -341,6 +375,13 @@ def validate_sector_intelligence(config: dict[str, dict[str, Any]] | None = None
         "moonbag_position",
         "boost_position",
         "stop_sma_days",
+    }
+    validation_required_keys = {
+        "avg_alpha",
+        "avg_protection",
+        "success_rate",
+        "assets",
+        "validated_on",
     }
     ticker_to_sector = {}
 
@@ -394,6 +435,39 @@ def validate_sector_intelligence(config: dict[str, dict[str, Any]] | None = None
             if strategy_params.get("stop_sma_days") not in (20, 50):
                 errors.append(f"{sector_name}: strategy_params.stop_sma_days must be 20 or 50")
 
+            exit_threshold = strategy_params.get("exit_threshold")
+            if isinstance(threshold, (int, float)) and isinstance(exit_threshold, (int, float)):
+                if round(threshold, 4) != round(exit_threshold, 4):
+                    errors.append(f"{sector_name}: danger_zone_threshold must match strategy_params.exit_threshold")
+
+        validation_metrics = sector_data.get("validation_metrics")
+        if not isinstance(validation_metrics, dict):
+            errors.append(f"{sector_name}: validation_metrics must be a dict")
+        else:
+            missing_validation_keys = validation_required_keys - set(validation_metrics)
+            if missing_validation_keys:
+                errors.append(f"{sector_name}: validation_metrics missing keys {sorted(missing_validation_keys)}")
+
+            for key in ("avg_alpha", "avg_protection", "success_rate"):
+                value = validation_metrics.get(key)
+                if not isinstance(value, (int, float)):
+                    errors.append(f"{sector_name}: validation_metrics.{key} must be numeric")
+
+            assets_tested = validation_metrics.get("assets")
+            if not isinstance(assets_tested, int) or assets_tested < 0:
+                errors.append(f"{sector_name}: validation_metrics.assets must be a non-negative integer")
+            if sector_data.get("validation_status") != "watch_only" and assets_tested == 0:
+                errors.append(f"{sector_name}: validation_metrics.assets must be positive unless watch_only")
+
+            try:
+                parse_review_date(validation_metrics.get("validated_on", ""))
+            except (TypeError, ValueError):
+                errors.append(f"{sector_name}: validation_metrics.validated_on must use YYYY-MM-DD")
+
+        validation_status = sector_data.get("validation_status")
+        if validation_status not in VALIDATION_STATUSES:
+            errors.append(f"{sector_name}: validation_status must be one of {sorted(VALIDATION_STATUSES)}")
+
         assets = sector_data.get("assets")
         if not isinstance(assets, dict) or not assets:
             errors.append(f"{sector_name}: assets must be a non-empty dict")
@@ -410,6 +484,18 @@ def validate_sector_intelligence(config: dict[str, dict[str, Any]] | None = None
             ticker_to_sector[ticker] = sector_name
 
     return errors
+
+
+def get_sector_readiness(sector_data: dict[str, Any]) -> str:
+    """Return a compact human-readable readiness label for report output."""
+    status = sector_data.get("validation_status", "watch_only")
+    if status == "validated":
+        return "Validated"
+    if status == "thin_edge":
+        return "Thin Edge"
+    if status == "return_edge_drawdown_risk":
+        return "Return Edge / DD Risk"
+    return "Watch Only"
 
 
 def get_btc_on_chain_floors(dynamic: bool = True) -> dict[str, int]:

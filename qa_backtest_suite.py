@@ -1,11 +1,10 @@
+import argparse
 import pandas as pd
 import numpy as np
-import os
-import sys
 from itertools import product
-from datetime import datetime, timedelta
+from datetime import datetime
 from enhanced_risk_analyzer import analyze_asset
-from sector_config import SECTOR_INTELLIGENCE
+from sector_config import SECTOR_INTELLIGENCE, get_sector_readiness
 
 
 THRESHOLD_GRID = [round(x, 2) for x in np.arange(0.55, 0.96, 0.05)]
@@ -23,6 +22,8 @@ def get_sector_strategy_params(sector_data):
     params.setdefault("boost_position", 1.4)
     params.setdefault("stop_sma_days", 20)
     return params
+
+
 STRATEGY_GRID_SIZE = (
     len(THRESHOLD_GRID)
     * len(BUY_THRESHOLD_GRID)
@@ -255,22 +256,73 @@ def optimize_sector_strategy(prepared_assets, fee=0.001):
     return recommendations
 
 
-def run_suite():
+def configured_sector_readiness(prepared_assets, sectors=None, tickers=None):
+    readiness = []
+
+    for sector_name, sector_data, assets in iter_selected_assets(sectors=sectors, tickers=tickers):
+        metrics = sector_data.get("validation_metrics", {})
+        readiness.append({
+            "Sector": sector_name,
+            "Readiness": get_sector_readiness(sector_data),
+            "Configured Assets": len(assets),
+            "Backtest Assets": metrics.get("assets", 0),
+            "Loaded Assets": len(prepared_assets.get(sector_name, [])),
+            "Avg Alpha": metrics.get("avg_alpha", 0),
+            "Avg Protection": metrics.get("avg_protection", 0),
+            "Success Rate": metrics.get("success_rate", 0),
+            "Validated On": metrics.get("validated_on", "N/A"),
+        })
+
+    return readiness
+
+
+def normalize_ticker(value):
+    ticker = value.strip().upper()
+    if ticker and "." not in ticker and "-" not in ticker and "=" not in ticker:
+        ticker = f"{ticker}.AX"
+    return ticker
+
+
+def iter_selected_assets(sectors=None, tickers=None):
+    selected_sectors = {sector.strip() for sector in sectors or []}
+    selected_tickers = {normalize_ticker(ticker) for ticker in tickers or []}
+
+    for sector_name, sector_data in SECTOR_INTELLIGENCE.items():
+        if selected_sectors and sector_name not in selected_sectors:
+            continue
+
+        assets = {}
+        for name, ticker in sector_data["assets"].items():
+            if selected_tickers and ticker.upper() not in selected_tickers:
+                continue
+            assets[name] = ticker
+
+        if assets:
+            yield sector_name, sector_data, assets
+
+
+def run_suite(sectors=None, tickers=None, run_sweeps=True):
     print(f"\n{'='*80}")
     print(f" INSTITUTIONAL QA & MULTI-MARKET BACKTEST (v2.1 Momentum Stop)")
     print(f" Date: {datetime.now().strftime('%Y-%m-%d')}")
+    if sectors:
+        print(f" Sectors: {', '.join(sectors)}")
+    if tickers:
+        print(f" Tickers: {', '.join(tickers)}")
+    if not run_sweeps:
+        print(" Sweeps: disabled")
     print(f"{'='*80}")
     
     results = []
     prepared_assets = {}
     skipped = 0
     
-    for sector_name, sector_data in SECTOR_INTELLIGENCE.items():
+    for sector_name, sector_data, assets in iter_selected_assets(sectors=sectors, tickers=tickers):
         strategy_params = get_sector_strategy_params(sector_data)
         prepared_assets[sector_name] = []
         
-        for name, ticker in sector_data["assets"].items():
-            print(f"Testing {ticker} ({sector_name})...")
+        for name, ticker in assets.items():
+            print(f"Testing {ticker} ({sector_name})...", flush=True)
             df, reason = prepare_backtest_frame(ticker)
             if reason:
                 print(f"  Skipping {ticker}: {reason}")
@@ -300,27 +352,46 @@ def run_suite():
         print("No assets validated. Check data/network availability before tuning thresholds.")
     print(f"Assets Skipped:     {skipped}")
 
-    recommendations = optimize_sector_thresholds(prepared_assets)
-    if recommendations:
-        rec_df = pd.DataFrame(recommendations)
-        rec_df["Avg Alpha"] = rec_df["Avg Alpha"].map(lambda x: f"{x:+.2f}x")
-        rec_df["Avg Protection"] = rec_df["Avg Protection"].map(lambda x: f"{x:+.1f}%")
-        rec_df["Success Rate"] = rec_df["Success Rate"].map(lambda x: f"{x:.0f}%")
-        rec_df["Score"] = rec_df["Score"].map(lambda x: f"{x:+.2f}")
-        print("\n--- THRESHOLD SWEEP RECOMMENDATIONS ---")
-        print(rec_df.to_string(index=False))
+    readiness = configured_sector_readiness(prepared_assets, sectors=sectors, tickers=tickers)
+    if readiness:
+        readiness_df = pd.DataFrame(readiness)
+        readiness_df["Avg Alpha"] = readiness_df["Avg Alpha"].map(lambda x: f"{x:+.2f}x")
+        readiness_df["Avg Protection"] = readiness_df["Avg Protection"].map(lambda x: f"{x:+.1f}%")
+        readiness_df["Success Rate"] = readiness_df["Success Rate"].map(lambda x: f"{x:.0f}%")
+        print("\n--- CONFIGURED SECTOR READINESS ---")
+        print(readiness_df.to_string(index=False))
 
-    strategy_recommendations = optimize_sector_strategy(prepared_assets)
-    if strategy_recommendations:
-        strategy_df = pd.DataFrame(strategy_recommendations)
-        strategy_df["Avg Alpha"] = strategy_df["Avg Alpha"].map(lambda x: f"{x:+.2f}x")
-        strategy_df["Avg Protection"] = strategy_df["Avg Protection"].map(lambda x: f"{x:+.1f}%")
-        strategy_df["Success Rate"] = strategy_df["Success Rate"].map(lambda x: f"{x:.0f}%")
-        strategy_df["Score"] = strategy_df["Score"].map(lambda x: f"{x:+.2f}")
-        print("\n--- STRATEGY PARAMETER SWEEP RECOMMENDATIONS ---")
-        print(strategy_df.to_string(index=False))
+    if run_sweeps:
+        recommendations = optimize_sector_thresholds(prepared_assets)
+        if recommendations:
+            rec_df = pd.DataFrame(recommendations)
+            rec_df["Avg Alpha"] = rec_df["Avg Alpha"].map(lambda x: f"{x:+.2f}x")
+            rec_df["Avg Protection"] = rec_df["Avg Protection"].map(lambda x: f"{x:+.1f}%")
+            rec_df["Success Rate"] = rec_df["Success Rate"].map(lambda x: f"{x:.0f}%")
+            rec_df["Score"] = rec_df["Score"].map(lambda x: f"{x:+.2f}")
+            print("\n--- THRESHOLD SWEEP RECOMMENDATIONS ---")
+            print(rec_df.to_string(index=False))
+
+        strategy_recommendations = optimize_sector_strategy(prepared_assets)
+        if strategy_recommendations:
+            strategy_df = pd.DataFrame(strategy_recommendations)
+            strategy_df["Avg Alpha"] = strategy_df["Avg Alpha"].map(lambda x: f"{x:+.2f}x")
+            strategy_df["Avg Protection"] = strategy_df["Avg Protection"].map(lambda x: f"{x:+.1f}%")
+            strategy_df["Success Rate"] = strategy_df["Success Rate"].map(lambda x: f"{x:.0f}%")
+            strategy_df["Score"] = strategy_df["Score"].map(lambda x: f"{x:+.2f}")
+            print("\n--- STRATEGY PARAMETER SWEEP RECOMMENDATIONS ---")
+            print(strategy_df.to_string(index=False))
 
     print(f"{'='*80}\n")
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run sector backtests and strategy sweeps.")
+    parser.add_argument("--sector", action="append", dest="sectors", help="Limit to a sector name. Repeatable.")
+    parser.add_argument("--ticker", action="append", dest="tickers", help="Limit to a ticker, e.g. HACK or HACK.AX. Repeatable.")
+    parser.add_argument("--no-sweep", action="store_true", help="Skip threshold and strategy optimization sweeps.")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    run_suite()
+    args = parse_args()
+    run_suite(sectors=args.sectors, tickers=args.tickers, run_sweeps=not args.no_sweep)

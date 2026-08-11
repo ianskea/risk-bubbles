@@ -12,6 +12,7 @@ from enhanced_risk_analyzer import analyze_asset
 from sector_config import (
     SECTOR_INTELLIGENCE,
     get_btc_on_chain_floors,
+    get_sector_readiness,
     get_stale_sector_reviews,
     validate_sector_intelligence,
 )
@@ -76,6 +77,7 @@ def generate_ai_analysis(ticker, price, risk, metrics, meta):
     Composite Risk Score: {risk:.2f} (0.0 = Buy/Value, 1.0 = Sell/Bubble)
     Gone Home Status: {meta.get('gone_home', 'N/A')}
     Sector Context: {meta.get('sector_context', 'General Asset')}
+    Sector Readiness: {meta.get('sector_readiness', 'N/A')}
     Sector Threshold Rationale: {meta.get('sector_threshold_rationale', 'N/A')}
     Strategy Parameters: {meta.get('sector_strategy_params', 'N/A')}
     
@@ -143,6 +145,18 @@ def get_stop_level(meta, price, stop_sma_days):
             return price / (1 + ma50_dist)
 
     return meta.get("sma_20d")
+
+
+def format_sector_validation_metrics(metrics):
+    if not metrics:
+        return "N/A"
+
+    return (
+        f"alpha {metrics.get('avg_alpha', 0):+.2f}x, "
+        f"protection {metrics.get('avg_protection', 0):+.1f}%, "
+        f"success {metrics.get('success_rate', 0):.0f}%, "
+        f"assets {metrics.get('assets', 0)}"
+    )
 
 def analyze_market_cycle():
     """
@@ -245,6 +259,7 @@ def main():
         strategy_params = get_sector_strategy_params(sector_data)
         exit_t = strategy_params["exit_threshold"]
         fetch_santiment = sector_data.get("fetch_santiment", False)
+        sector_readiness = get_sector_readiness(sector_data)
         
         for name, ticker in sector_data["assets"].items():
             print(f"Analyzing {name} ({ticker})...")
@@ -292,12 +307,15 @@ def main():
                     "meta": meta,
                     "val_metrics": val_metrics,
                     "sector": sector_name,
+                    "sector_readiness": sector_readiness,
                     "exit_threshold": exit_t,
                     "strategy_params": strategy_params,
                 }
                 
                 # Inject Sector Context
                 asset_data["meta"]["sector_context"] = sector_data.get("sector_context", "General Asset")
+                asset_data["meta"]["sector_readiness"] = sector_readiness
+                asset_data["meta"]["sector_validation_metrics"] = sector_data.get("validation_metrics", {})
                 asset_data["meta"]["sector_threshold_rationale"] = sector_data.get("threshold_rationale", "N/A")
                 asset_data["meta"]["sector_source_tags"] = sector_data.get("source_tags", [])
                 asset_data["meta"]["sector_strategy_params"] = strategy_params
@@ -399,6 +417,7 @@ Price: ${asset['price']:.2f}
 RISK SCORE: {r:.2f}  {signal_str}
 Gone Home Status: {meta.get('gone_home', 'N/A')}
 Validation Score: {asset['score']}/100
+Sector Readiness: {asset.get('sector_readiness', 'N/A')}
 """
         # [NEW] On-Chain Context for BTC
         if asset['ticker'] == "BTC-USD":
@@ -414,6 +433,7 @@ Validation Score: {asset['score']}/100
             section += f"Santiment (31d Lag): MVRV {mvrv_str} ({sant_sum.get('mvrv_status', 'N/A')}) | Sentiment: {sant_sum.get('sentiment_status', 'N/A')}\n"
             
         section += f"Context: {context_line}\n"
+        section += f"Sector Validation: {format_sector_validation_metrics(meta.get('sector_validation_metrics'))}\n"
         section += (
             f"Strategy Params: exit {exit_t:.2f}, buy {buy_t:.2f}, "
             f"moonbag {moonbag:.1f}x, boost {boost:.1f}x, stop SMA {stop_sma_days}d\n"
